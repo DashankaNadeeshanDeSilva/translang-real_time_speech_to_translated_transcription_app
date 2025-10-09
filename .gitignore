@@ -34,3 +34,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project documentation (not for version control)
+/prompts/
+PHASE0-COMPLETE.md
+PHASE1-COMPLETE.md
+PHASE2-COMPLETE.md
+PHASE2-SUMMARY.md
+README-SETUP.md
+TESTING-GUIDE.md
+PROJECT-STATUS.md
