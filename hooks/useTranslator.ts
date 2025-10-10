@@ -18,6 +18,7 @@ import {
   isSessionTerminationError,
   ErrorType,
 } from '@/utils/errorHandler';
+import { LatencyTracker, LatencyMetrics as LatencyMetricsType } from '@/utils/latencyTracker';
 
 /**
  * useTranslator Hook
@@ -81,6 +82,11 @@ interface UseTranslatorReturn {
   retryCount: number;
   maxRetries: number;
   reconnectionMessage: string;
+  
+  // Latency metrics (Phase 5)
+  latencyMetrics: LatencyMetricsType;
+  showMetrics: boolean;
+  toggleMetrics: () => void;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -108,6 +114,21 @@ export function useTranslator(): UseTranslatorReturn {
   const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState<number>(0);
   const [reconnectionMessage, setReconnectionMessage] = useState<string>('');
+  
+  // Latency metrics (Phase 5)
+  const [latencyMetrics, setLatencyMetrics] = useState<LatencyMetricsType>({
+    captureToDisplay: null,
+    audioProcessing: null,
+    networkRoundTrip: null,
+    rendering: null,
+    averageLatency: 0,
+    minLatency: Infinity,
+    maxLatency: 0,
+    sampleCount: 0,
+    currentLatency: null,
+    lastUpdateTime: Date.now(),
+  });
+  const [showMetrics, setShowMetrics] = useState<boolean>(false);
 
   // Refs to maintain state across renders
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -127,6 +148,9 @@ export function useTranslator(): UseTranslatorReturn {
   const retryManagerRef = useRef<RetryManager>(new RetryManager());
   const sessionStateRef = useRef<SessionStateManager>(new SessionStateManager());
   const maxRetries = 5;
+  
+  // Latency tracker (Phase 5)
+  const latencyTrackerRef = useRef<LatencyTracker>(new LatencyTracker());
 
   /**
    * Clear transcript and reset state
@@ -160,6 +184,13 @@ export function useTranslator(): UseTranslatorReturn {
   }, []);
 
   /**
+   * Toggle metrics display (Phase 5)
+   */
+  const toggleMetrics = useCallback(() => {
+    setShowMetrics(prev => !prev);
+  }, []);
+
+  /**
    * Cleanup VAD and Keepalive managers
    */
   const cleanupManagers = useCallback(async () => {
@@ -190,7 +221,7 @@ export function useTranslator(): UseTranslatorReturn {
   /**
    * Process incoming tokens and update state
    */
-  const handleTokenUpdate = useCallback((tokens: Token[]) => {
+  const handleTokenUpdate = useCallback((tokens: Token[], audioProcessedMs?: number) => {
     // Process translation tokens (English)
     const {
       newCommittedText: newTranslationText,
@@ -222,6 +253,14 @@ export function useTranslator(): UseTranslatorReturn {
       
       setCommittedTranslation(prev => [...prev, newLine]);
       console.log('✅ Committed translation:', cleanedText);
+      
+      // Track latency for final translations (Phase 5)
+      const latency = latencyTrackerRef.current.markDisplayed('translation');
+      if (latency !== null) {
+        console.log(`⏱️ Translation latency: ${Math.round(latency)}ms`);
+        // Update metrics state
+        setLatencyMetrics(latencyTrackerRef.current.getMetrics());
+      }
     }
 
     // Commit new final source text
@@ -242,6 +281,11 @@ export function useTranslator(): UseTranslatorReturn {
 
     // Update live source
     setLiveSource(newLiveSource);
+    
+    // Mark token received for latency tracking (Phase 5)
+    if (audioProcessedMs !== undefined) {
+      latencyTrackerRef.current.markTokenReceived(audioProcessedMs);
+    }
   }, []);
 
   /**
@@ -530,10 +574,18 @@ export function useTranslator(): UseTranslatorReturn {
         },
 
         onPartialResult: (result: TranslatorResult) => {
-          // Process tokens and update state
-          handleTokenUpdate(result.tokens);
+          // Mark capture start for latency tracking (Phase 5)
+          if (result.tokens.some(t => t.is_final)) {
+            // Only track when we get final tokens
+            if (!latencyTrackerRef.current.getMetrics().currentLatency) {
+              latencyTrackerRef.current.markCaptureStart();
+            }
+          }
           
-          // Keep console logging for debugging (Phase 2)
+          // Process tokens and update state
+          handleTokenUpdate(result.tokens, result.final_audio_proc_ms);
+          
+          // Keep console logging for debugging
           console.log('📝 Partial result received:');
           
           // Log translation-specific details
@@ -786,6 +838,11 @@ export function useTranslator(): UseTranslatorReturn {
     retryCount,
     maxRetries,
     reconnectionMessage,
+    
+    // Latency metrics (Phase 5)
+    latencyMetrics,
+    showMetrics,
+    toggleMetrics,
   };
 }
 

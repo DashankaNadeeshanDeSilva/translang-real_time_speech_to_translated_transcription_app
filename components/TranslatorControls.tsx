@@ -4,6 +4,7 @@ import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { VADSettings } from './VADSettings';
 import { ReconnectingBanner } from './ReconnectingBanner';
+import { LatencyMetrics } from './LatencyMetrics';
 
 /**
  * TranslatorControls Component
@@ -35,6 +36,9 @@ export function TranslatorControls() {
     retryCount,
     maxRetries,
     reconnectionMessage,
+    latencyMetrics,
+    showMetrics,
+    toggleMetrics,
   } = useTranslator();
 
   return (
@@ -81,11 +85,11 @@ export function TranslatorControls() {
 
         <div style={styles.instructions}>
           <p><strong>Phase 4: Resilient Real-Time Translation</strong></p>
-          <p>Click "Start Translation" and speak in German.</p>
-          <p>Translations auto-finalize during pauses (VAD enabled).</p>
+          <p>Click "Start Translation" and speak in German. Auto-reconnects if connection drops!</p>
           <p>
             🟢 Green = Final | 🔵 Blue italic = Live<br />
-            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}
+            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}<br />
+            🔄 Auto-reconnect up to {maxRetries} times on errors
           </p>
         </div>
 
@@ -139,6 +143,15 @@ export function TranslatorControls() {
               {showSource ? '🙈 Hide German' : '👁️ Show German'}
             </button>
           )}
+          
+          {committedTranslation.length > 0 && (
+            <button
+              onClick={toggleMetrics}
+              style={styles.metricsButton}
+            >
+              {showMetrics ? '📊 Hide Metrics' : '📈 Show Metrics'}
+            </button>
+          )}
         </div>
 
         {/* VAD Settings (Phase 3) */}
@@ -162,15 +175,23 @@ export function TranslatorControls() {
           isRecording={isRecording}
         />
 
+        {/* Latency Metrics (Phase 5) */}
+        {showMetrics && (
+          <LatencyMetrics
+            metrics={latencyMetrics}
+            isRecording={isRecording}
+          />
+        )}
+
         <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 4)</h3>
+          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 5)</h3>
           <ul style={styles.infoList}>
             <li><strong>Green boxes</strong> are final, confirmed translations</li>
             <li><strong>Blue italic text</strong> is live, updating as you speak</li>
             <li><strong>VAD</strong> detects silence and auto-finalizes</li>
             <li><strong>Auto-reconnect</strong> recovers from connection issues (up to {maxRetries} attempts)</li>
-            <li><strong>Session recovery</strong> preserves your translations during reconnection</li>
-            <li><strong>Keepalive</strong> maintains connection during pauses</li>
+            <li><strong>Latency tracking</strong> measures performance in real-time (toggle metrics to view)</li>
+            <li><strong>Optimized display</strong> shows many translations at once</li>
           </ul>
         </div>
       </div>
@@ -302,6 +323,17 @@ const styles = {
   toggleButton: {
     padding: '0.75rem 1rem',
     backgroundColor: '#8b5cf6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  metricsButton: {
+    padding: '0.75rem 1rem',
+    backgroundColor: '#06b6d4',
     color: 'white',
     border: 'none',
     borderRadius: '0.5rem',
