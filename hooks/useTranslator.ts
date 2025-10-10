@@ -9,6 +9,15 @@ import {
 } from '@/utils/tokenParser';
 import { VADManager, DEFAULT_VAD_CONFIG } from '@/utils/vadManager';
 import { KeepaliveManager } from '@/utils/keepaliveManager';
+import {
+  RetryManager,
+  SessionStateManager,
+  classifyError,
+  isRetryableError,
+  getUserFriendlyMessage,
+  isSessionTerminationError,
+  ErrorType,
+} from '@/utils/errorHandler';
 
 /**
  * useTranslator Hook
@@ -66,6 +75,12 @@ interface UseTranslatorReturn {
   toggleVAD: () => void;
   silenceThreshold: number;
   setSilenceThreshold: (threshold: number) => void;
+  
+  // Reconnection state (Phase 4)
+  isReconnecting: boolean;
+  retryCount: number;
+  maxRetries: number;
+  reconnectionMessage: string;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -88,6 +103,11 @@ export function useTranslator(): UseTranslatorReturn {
   // VAD configuration (Phase 3)
   const [vadEnabled, setVadEnabled] = useState<boolean>(true);
   const [silenceThreshold, setSilenceThreshold] = useState<number>(DEFAULT_VAD_CONFIG.silenceThreshold);
+  
+  // Reconnection state (Phase 4)
+  const [isReconnecting, setIsReconnecting] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const [reconnectionMessage, setReconnectionMessage] = useState<string>('');
 
   // Refs to maintain state across renders
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -102,6 +122,11 @@ export function useTranslator(): UseTranslatorReturn {
   const keepaliveManagerRef = useRef<KeepaliveManager | null>(null);
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // Error handling managers (Phase 4)
+  const retryManagerRef = useRef<RetryManager>(new RetryManager());
+  const sessionStateRef = useRef<SessionStateManager>(new SessionStateManager());
+  const maxRetries = 5;
 
   /**
    * Clear transcript and reset state
@@ -338,14 +363,47 @@ export function useTranslator(): UseTranslatorReturn {
   }, []);
 
   /**
-   * Start translation session
+   * Attempt to reconnect after error (Phase 4)
    */
-  const startTranslation = useCallback(async () => {
-    if (isRecording || isConnecting) {
-      console.warn('⚠️ Translation already in progress');
+  const attemptReconnection = useCallback(async (errorType: ErrorType) => {
+    if (!retryManagerRef.current.canRetry()) {
+      console.error('❌ Max retries exceeded, cannot reconnect');
+      setIsReconnecting(false);
+      setError('Connection failed after multiple attempts. Please try again.');
       return;
     }
 
+    setIsReconnecting(true);
+    const message = getUserFriendlyMessage(errorType);
+    setReconnectionMessage(message);
+    
+    const stats = retryManagerRef.current.getStats();
+    setRetryCount(stats.currentRetry + 1);
+    
+    console.log(`🔄 Attempting reconnection (${stats.currentRetry + 1}/${stats.maxRetries})...`);
+
+    try {
+      await retryManagerRef.current.scheduleRetry(async () => {
+        // Finalize any pending tokens before reconnecting
+        finalizeTranscript();
+        
+        // Save current state
+        sessionStateRef.current.saveState(committedTranslation.length);
+        
+        // Restart translation session
+        await startTranslationInternal();
+      });
+    } catch (error) {
+      console.error('❌ Reconnection failed:', error);
+      setIsReconnecting(false);
+      setError('Failed to reconnect. Please try starting again.');
+    }
+  }, [committedTranslation.length]);
+
+  /**
+   * Internal start translation function (used for both initial start and reconnection)
+   */
+  const startTranslationInternal = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
 
@@ -412,6 +470,13 @@ export function useTranslator(): UseTranslatorReturn {
         // Callbacks
         onStarted: () => {
           console.log('✅ Translation started successfully');
+          
+          // Reset retry manager on successful connection (Phase 4)
+          retryManagerRef.current.reset();
+          setIsReconnecting(false);
+          setRetryCount(0);
+          setReconnectionMessage('');
+          
           setIsConnecting(false);
           setIsRecording(true);
 
@@ -493,10 +558,27 @@ export function useTranslator(): UseTranslatorReturn {
         onFinished: () => {
           console.log('✅ Translation session finished');
           
-          // Finalize any remaining tokens
-          finalizeTranscript();
+          // Check if this is an unexpected termination (Phase 4)
+          // If user didn't explicitly stop, this might be a session limit
+          if (isRecording && mediaStreamRef.current) {
+            console.warn('⚠️ Session terminated unexpectedly, may attempt reconnection');
+            
+            // Finalize any remaining tokens
+            finalizeTranscript();
+            
+            // Save state
+            sessionStateRef.current.saveState(committedTranslation.length);
+            
+            // Attempt reconnection if we still have media stream
+            if (retryManagerRef.current.canRetry()) {
+              console.log('🔄 Attempting automatic session restart...');
+              attemptReconnection(ErrorType.SESSION_TERMINATED);
+              return;
+            }
+          }
           
-          // Cleanup VAD and Keepalive
+          // Normal termination - finalize and cleanup
+          finalizeTranscript();
           cleanupManagers();
           
           setIsRecording(false);
@@ -511,17 +593,46 @@ export function useTranslator(): UseTranslatorReturn {
 
         onError: (status: any, message: string, errorCode?: number) => {
           console.error('❌ Translation error:', status, message, errorCode);
-          setError(`Error ${errorCode || status}: ${message}`);
-          setIsRecording(false);
-          setIsConnecting(false);
           
-          // Cleanup VAD and Keepalive
-          cleanupManagers();
+          // Classify error type (Phase 4)
+          const errorType = classifyError(errorCode || status, message);
+          console.log(`🔍 Error classified as: ${errorType}`);
           
-          // Clean up on error
-          if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
-            mediaStreamRef.current = null;
+          // Check if this is a session termination error
+          const isTermination = isSessionTerminationError(message);
+          
+          // Determine if we should attempt reconnection
+          const shouldReconnect = isRetryableError(errorType) || isTermination;
+          
+          if (shouldReconnect && mediaStreamRef.current) {
+            console.log('🔄 Error is retryable, attempting reconnection...');
+            
+            // Don't cleanup media stream yet - we'll reuse it
+            // Just cleanup Soniox client and managers
+            cleanupManagers();
+            
+            // Set temporary error message
+            setError(`${message} - Reconnecting...`);
+            setIsRecording(false);
+            setIsConnecting(false);
+            
+            // Attempt reconnection
+            attemptReconnection(errorType);
+          } else {
+            // Non-retryable error - full cleanup
+            console.log('❌ Error is not retryable, stopping session');
+            setError(`Error ${errorCode || status}: ${message}`);
+            setIsRecording(false);
+            setIsConnecting(false);
+            setIsReconnecting(false);
+            
+            // Full cleanup
+            cleanupManagers();
+            
+            if (mediaStreamRef.current) {
+              mediaStreamRef.current.getTracks().forEach(track => track.stop());
+              mediaStreamRef.current = null;
+            }
           }
         },
       });
@@ -541,18 +652,41 @@ export function useTranslator(): UseTranslatorReturn {
         mediaStreamRef.current = null;
       }
     }
-  }, [isRecording, isConnecting, getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers]);
+  }, [getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers, attemptReconnection]);
+
+  /**
+   * Public start translation function
+   */
+  const startTranslation = useCallback(async () => {
+    if (isRecording || isConnecting) {
+      console.warn('⚠️ Translation already in progress');
+      return;
+    }
+
+    // Reset retry manager for fresh start
+    retryManagerRef.current.reset();
+    sessionStateRef.current.reset();
+    setRetryCount(0);
+    setIsReconnecting(false);
+    
+    await startTranslationInternal();
+  }, [isRecording, isConnecting, startTranslationInternal]);
 
   /**
    * Stop translation (graceful)
    */
   const stopTranslation = useCallback(async () => {
-    if (!sonioxClientRef.current) {
+    console.log('🛑 Stopping translation gracefully...');
+    
+    // Cancel any pending retries (Phase 4)
+    retryManagerRef.current.cancel();
+    setIsReconnecting(false);
+    setRetryCount(0);
+    
+    if (!sonioxClientRef.current && !isReconnecting) {
       console.warn('⚠️ No active translation session to stop');
       return;
     }
-
-    console.log('🛑 Stopping translation gracefully...');
     
     // Finalize any remaining tokens before stopping
     finalizeTranscript();
@@ -560,39 +694,12 @@ export function useTranslator(): UseTranslatorReturn {
     // Cleanup VAD and Keepalive
     await cleanupManagers();
     
-    try {
-      sonioxClientRef.current.stop();
-    } catch (err) {
-      console.error('❌ Error stopping translation:', err);
-    }
-
-    // Clean up media stream
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    sonioxClientRef.current = null;
-  }, [finalizeTranscript, cleanupManagers]);
-
-  /**
-   * Cancel translation (abrupt)
-   */
-  const cancelTranslation = useCallback(async () => {
-    if (!sonioxClientRef.current) {
-      console.warn('⚠️ No active translation session to cancel');
-      return;
-    }
-
-    console.log('⚠️ Canceling translation...');
-    
-    // Cleanup VAD and Keepalive
-    await cleanupManagers();
-    
-    try {
-      sonioxClientRef.current.cancel();
-    } catch (err) {
-      console.error('❌ Error canceling translation:', err);
+    if (sonioxClientRef.current) {
+      try {
+        sonioxClientRef.current.stop();
+      } catch (err) {
+        console.error('❌ Error stopping translation:', err);
+      }
     }
 
     // Clean up media stream
@@ -604,7 +711,45 @@ export function useTranslator(): UseTranslatorReturn {
     sonioxClientRef.current = null;
     setIsRecording(false);
     setIsConnecting(false);
-  }, [cleanupManagers]);
+  }, [finalizeTranscript, cleanupManagers, isReconnecting]);
+
+  /**
+   * Cancel translation (abrupt)
+   */
+  const cancelTranslation = useCallback(async () => {
+    console.log('⚠️ Canceling translation...');
+    
+    // Cancel any pending retries (Phase 4)
+    retryManagerRef.current.cancel();
+    setIsReconnecting(false);
+    setRetryCount(0);
+    
+    if (!sonioxClientRef.current && !isReconnecting) {
+      console.warn('⚠️ No active translation session to cancel');
+      return;
+    }
+    
+    // Cleanup VAD and Keepalive
+    await cleanupManagers();
+    
+    if (sonioxClientRef.current) {
+      try {
+        sonioxClientRef.current.cancel();
+      } catch (err) {
+        console.error('❌ Error canceling translation:', err);
+      }
+    }
+
+    // Clean up media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    sonioxClientRef.current = null;
+    setIsRecording(false);
+    setIsConnecting(false);
+  }, [cleanupManagers, isReconnecting]);
 
   return {
     // Connection state
@@ -635,6 +780,12 @@ export function useTranslator(): UseTranslatorReturn {
     toggleVAD,
     silenceThreshold,
     setSilenceThreshold,
+    
+    // Reconnection state (Phase 4)
+    isReconnecting,
+    retryCount,
+    maxRetries,
+    reconnectionMessage,
   };
 }
 

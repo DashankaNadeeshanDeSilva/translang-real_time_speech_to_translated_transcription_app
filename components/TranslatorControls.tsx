@@ -3,12 +3,13 @@
 import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { VADSettings } from './VADSettings';
+import { ReconnectingBanner } from './ReconnectingBanner';
 
 /**
  * TranslatorControls Component
  * 
  * Provides UI controls for starting/stopping real-time translation.
- * Phase 3: Added VAD settings and improved silence detection.
+ * Phase 4: Added reconnection handling and error recovery.
  */
 
 export function TranslatorControls() {
@@ -30,6 +31,10 @@ export function TranslatorControls() {
     toggleVAD,
     silenceThreshold,
     setSilenceThreshold,
+    isReconnecting,
+    retryCount,
+    maxRetries,
+    reconnectionMessage,
   } = useTranslator();
 
   return (
@@ -60,14 +65,22 @@ export function TranslatorControls() {
           </div>
         </div>
 
-        {error && (
+        {/* Reconnection Banner (Phase 4) */}
+        <ReconnectingBanner
+          isReconnecting={isReconnecting}
+          retryCount={retryCount}
+          maxRetries={maxRetries}
+          errorMessage={reconnectionMessage}
+        />
+
+        {error && !isReconnecting && (
           <div style={styles.errorBox}>
             <strong>Error:</strong> {error}
           </div>
         )}
 
         <div style={styles.instructions}>
-          <p><strong>Phase 3: VAD & Intelligent Finalization</strong></p>
+          <p><strong>Phase 4: Resilient Real-Time Translation</strong></p>
           <p>Click "Start Translation" and speak in German.</p>
           <p>Translations auto-finalize during pauses (VAD enabled).</p>
           <p>
@@ -150,14 +163,14 @@ export function TranslatorControls() {
         />
 
         <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 3)</h3>
+          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 4)</h3>
           <ul style={styles.infoList}>
             <li><strong>Green boxes</strong> are final, confirmed translations</li>
             <li><strong>Blue italic text</strong> is live, updating as you speak</li>
-            <li><strong>VAD (Voice Activity Detection)</strong> detects silence and auto-finalizes</li>
-            <li>Translations appear with minimal latency (~100-500ms)</li>
+            <li><strong>VAD</strong> detects silence and auto-finalizes</li>
+            <li><strong>Auto-reconnect</strong> recovers from connection issues (up to {maxRetries} attempts)</li>
+            <li><strong>Session recovery</strong> preserves your translations during reconnection</li>
             <li><strong>Keepalive</strong> maintains connection during pauses</li>
-            <li>Optional: Toggle "Show German" to see original text</li>
           </ul>
         </div>
       </div>
@@ -179,7 +192,7 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '1rem',
     padding: '2rem',
-    maxWidth: '1200px',
+    maxWidth: '1600px',
     width: '100%',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
   },
