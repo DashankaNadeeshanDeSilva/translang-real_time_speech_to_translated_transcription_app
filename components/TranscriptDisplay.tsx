@@ -195,8 +195,8 @@ const styles = {
     flex: 1,
     overflowY: 'auto' as const,
     padding: '1.5rem',
-    minHeight: '600px',
-    maxHeight: '800px',
+    minHeight: '700px',
+    maxHeight: '900px',
   },
   emptyState: {
     display: 'flex',
@@ -238,6 +238,8 @@ const styles = {
     color: '#166534',
     wordWrap: 'break-word' as const,
     fontWeight: '500' as const,
+    animation: 'fadeInUp 0.3s ease-out',
+    transition: 'all 0.2s ease',
   },
   liveLine: {
     padding: '0.875rem 1.125rem',
@@ -254,6 +256,8 @@ const styles = {
     alignItems: 'center',
     gap: '0.25rem',
     fontWeight: '500' as const,
+    animation: 'scaleIn 0.2s ease-out',
+    transition: 'all 0.15s ease',
   },
   committedSourceLine: {
     padding: '1rem 1.25rem',
