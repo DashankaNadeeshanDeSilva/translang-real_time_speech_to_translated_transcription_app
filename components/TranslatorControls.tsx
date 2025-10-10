@@ -5,6 +5,9 @@ import { TranscriptDisplay } from './TranscriptDisplay';
 import { VADSettings } from './VADSettings';
 import { ReconnectingBanner } from './ReconnectingBanner';
 import { LatencyMetrics } from './LatencyMetrics';
+import { LanguageSettings } from './LanguageSettings';
+import { ExportControls } from './ExportControls';
+import { BrowserCompatWarning } from './BrowserCompatWarning';
 
 /**
  * TranslatorControls Component
@@ -39,12 +42,19 @@ export function TranslatorControls() {
     latencyMetrics,
     showMetrics,
     toggleMetrics,
+    sourceLanguage,
+    setSourceLanguage,
+    vocabularyContext,
+    setVocabularyContext,
   } = useTranslator();
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Real-Time German → English Translation</h2>
+        <h2 style={styles.title}>Real-Time Speech Translation</h2>
+        
+        {/* Browser Compatibility Warning (Phase 6) */}
+        <BrowserCompatWarning />
         
         <div style={styles.statusContainer}>
           <div style={styles.statusBadge}>
@@ -84,12 +94,12 @@ export function TranslatorControls() {
         )}
 
         <div style={styles.instructions}>
-          <p><strong>Phase 4: Resilient Real-Time Translation</strong></p>
-          <p>Click "Start Translation" and speak in German. Auto-reconnects if connection drops!</p>
+          <p><strong>Phase 6: Full-Featured Translation</strong></p>
+          <p>Configure language, add vocabulary hints, and export your translations!</p>
           <p>
             🟢 Green = Final | 🔵 Blue italic = Live<br />
-            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}<br />
-            🔄 Auto-reconnect up to {maxRetries} times on errors
+            🌍 {sourceLanguage === 'auto' ? 'Auto-detect language' : `Optimized for ${sourceLanguage.toUpperCase()}`}
+            {vocabularyContext && ' • 📚 Custom vocabulary active'}
           </p>
         </div>
 
@@ -154,6 +164,17 @@ export function TranslatorControls() {
           )}
         </div>
 
+        {/* Language Settings (Phase 6) */}
+        {!isRecording && (
+          <LanguageSettings
+            sourceLanguage={sourceLanguage}
+            setSourceLanguage={setSourceLanguage}
+            vocabularyContext={vocabularyContext}
+            setVocabularyContext={setVocabularyContext}
+            isRecording={isRecording}
+          />
+        )}
+
         {/* VAD Settings (Phase 3) */}
         {!isRecording && (
           <VADSettings
@@ -183,15 +204,24 @@ export function TranslatorControls() {
           />
         )}
 
+        {/* Export Controls (Phase 6) */}
+        {committedTranslation.length > 0 && (
+          <ExportControls
+            translations={committedTranslation}
+            source={committedSource}
+            includeSource={showSource}
+          />
+        )}
+
         <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 5)</h3>
+          <h3 style={styles.infoTitle}>ℹ️ Full Feature Set (Phase 6)</h3>
           <ul style={styles.infoList}>
-            <li><strong>Green boxes</strong> are final, confirmed translations</li>
-            <li><strong>Blue italic text</strong> is live, updating as you speak</li>
-            <li><strong>VAD</strong> detects silence and auto-finalizes</li>
-            <li><strong>Auto-reconnect</strong> recovers from connection issues (up to {maxRetries} attempts)</li>
-            <li><strong>Latency tracking</strong> measures performance in real-time (toggle metrics to view)</li>
-            <li><strong>Optimized display</strong> shows many translations at once</li>
+            <li><strong>Multi-Language</strong> - German, Spanish, French, Italian, Portuguese, or Auto-detect</li>
+            <li><strong>Custom Vocabulary</strong> - Add names, terms, acronyms for better accuracy</li>
+            <li><strong>Export</strong> - Download as TXT, JSON, or SRT subtitle format</li>
+            <li><strong>Copy</strong> - One-click copy to clipboard</li>
+            <li><strong>Smart Finalization</strong> - VAD auto-finalizes during pauses</li>
+            <li><strong>Auto-Reconnect</strong> - Resilient connection (up to {maxRetries} attempts)</li>
           </ul>
         </div>
       </div>
