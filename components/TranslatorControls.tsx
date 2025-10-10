@@ -179,7 +179,7 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '1rem',
     padding: '2rem',
-    maxWidth: '1200px',
+    maxWidth: '1600px',
     width: '100%',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
   },
