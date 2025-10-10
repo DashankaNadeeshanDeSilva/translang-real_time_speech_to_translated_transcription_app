@@ -9,17 +9,6 @@ A production-ready Next.js application that captures German speech and translate
 ![React](https://img.shields.io/badge/React-18.3-61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6)
 
----
-
-## 🎯 Current Status
-
-✅ **Phase 0:** Project scaffolding  
-✅ **Phase 1:** Audio streaming & real-time translation  
-✅ **Phase 2:** Token parsing & UI display  
-✅ **Phase 3:** VAD integration & intelligent finalization  
-🚧 **Phase 4:** Resilience & error handling (in progress)
-
----
 
 ## ✨ Key Features
 
