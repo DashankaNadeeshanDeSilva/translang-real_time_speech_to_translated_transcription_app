@@ -100,7 +100,7 @@ export function processTokenUpdate(
   incomingTokens: Token[],
   currentNonFinalBuffer: Token[]
 ): {
-  newFinalText: string;
+  newCommittedText: string;
   updatedNonFinalBuffer: Token[];
   liveText: string;
 } {
@@ -108,7 +108,7 @@ export function processTokenUpdate(
   const { finalTokens, nonFinalTokens } = splitTokensByFinality(incomingTokens);
 
   // Final tokens are committed immediately
-  const newFinalText = tokensToText(finalTokens);
+  const newCommittedText = tokensToText(finalTokens);
 
   // Non-final tokens replace the entire buffer
   // This prevents duplication as Soniox sends the complete current state
@@ -118,7 +118,7 @@ export function processTokenUpdate(
   const liveText = tokensToText(updatedNonFinalBuffer);
 
   return {
-    newFinalText,
+    newCommittedText,
     updatedNonFinalBuffer,
     liveText,
   };
