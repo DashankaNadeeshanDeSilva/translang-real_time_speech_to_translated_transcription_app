@@ -1,6 +1,6 @@
 # TransLang - Real-Time Speech Translation
 
-**Live German to English speech translation powered by Soniox AI**
+**Live Multilingual Speech Translation powered by Soniox AI**
 
 A production-ready Next.js application that captures German speech and translates it to English in real-time with intelligent voice activity detection and beautiful UI.
 
@@ -165,11 +165,6 @@ translang-real_time_speech_to_translated_transcription_app/
 ├── types/
 │   └── soniox.ts                 # TypeScript definitions
 ├── Documentation/
-│   ├── PHASE0-COMPLETE.md        # Setup & scaffolding
-│   ├── PHASE1-COMPLETE.md        # Audio streaming
-│   ├── PHASE2-COMPLETE.md        # UI display
-│   ├── PHASE3-COMPLETE.md        # VAD integration
-│   ├── PROJECT-STATUS.md         # Overall status
 │   └── TESTING-GUIDE.md          # Testing instructions
 ├── .env.local.example            # Environment template
 ├── package.json                  # Dependencies
@@ -325,42 +320,32 @@ translang-real_time_speech_to_translated_transcription_app/
 
 ---
 
-## 🎓 Documentation
+## 🚀 Deployment
 
-For detailed technical documentation, see:
+TransLang can be deployed to AWS using Docker + ECR + ECS Fargate.
 
-- **[PHASE0-COMPLETE.md](PHASE0-COMPLETE.md)** - Project setup
-- **[PHASE1-COMPLETE.md](PHASE1-COMPLETE.md)** - Audio streaming
-- **[PHASE2-COMPLETE.md](PHASE2-COMPLETE.md)** - UI display
-- **[PHASE3-COMPLETE.md](PHASE3-COMPLETE.md)** - VAD integration
-- **[PROJECT-STATUS.md](PROJECT-STATUS.md)** - Overall status
-- **[TESTING-GUIDE.md](TESTING-GUIDE.md)** - Testing instructions
+### Quick Deploy to AWS:
 
----
+```bash
+# See deployment/QUICK-START.md for full guide
 
-## 🗺️ Roadmap
+# 1. Build Docker image
+docker build -t translang:latest .
 
-### ✅ Completed
-- [x] Real-time audio capture
-- [x] Soniox WebSocket integration
-- [x] German → English translation
-- [x] Token parsing and deduplication
-- [x] Beautiful UI with live/final distinction
-- [x] VAD integration
-- [x] Auto-finalization on silence
-- [x] Keepalive mechanism
-- [x] Large, readable interface
+# 2. Push to AWS ECR
+# (See deployment guides for complete steps)
 
-### 🚧 In Progress (Phase 4)
-- [ ] WebSocket reconnection logic
-- [ ] Error recovery mechanisms
-- [ ] Session recovery after interruption
-- [ ] Timeout management
+# 3. Deploy to ECS Fargate
+# (Automated with deploy.sh script)
+```
 
-### 📅 Planned
-- **Phase 5:** UI polish (shadcn components, latency measurement)
-- **Phase 6:** Edge cases (multi-language, vocabulary hints, export)
-- **Phase 7:** Testing & deployment
+**📚 Deployment Documentation:**
+- **[QUICK-START.md](deployment/QUICK-START.md)** - Deploy in 30 minutes
+- **[AWS-DEPLOYMENT-GUIDE.md](deployment/AWS-DEPLOYMENT-GUIDE.md)** - Complete guide
+- **[AWS-ARCHITECTURE.md](deployment/AWS-ARCHITECTURE.md)** - Architecture explanation
+- **[MONITORING.md](deployment/MONITORING.md)** - Operations guide
+
+**Cost:** ~$11-33/month on AWS Fargate
 
 ---
 
