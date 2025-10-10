@@ -81,11 +81,11 @@ export function TranslatorControls() {
 
         <div style={styles.instructions}>
           <p><strong>Phase 4: Resilient Real-Time Translation</strong></p>
-          <p>Click "Start Translation" and speak in German.</p>
-          <p>Translations auto-finalize during pauses (VAD enabled).</p>
+          <p>Click "Start Translation" and speak in German. Auto-reconnects if connection drops!</p>
           <p>
             🟢 Green = Final | 🔵 Blue italic = Live<br />
-            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}
+            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}<br />
+            🔄 Auto-reconnect up to {maxRetries} times on errors
           </p>
         </div>
 
