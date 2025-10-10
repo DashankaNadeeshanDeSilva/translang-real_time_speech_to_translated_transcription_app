@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  
+  // Production optimization for Docker/AWS deployment
+  output: 'standalone', // Creates standalone build for Docker
+  compress: true,
+  
   webpack: (config, { isServer }) => {
     // Support for WASM files (needed for VAD library)
     config.experiments = {
@@ -20,6 +25,11 @@ const nextConfig = {
     }
 
     return config;
+  },
+  
+  // Environment variables
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version || '1.0.0',
   },
 };
 
