@@ -87,6 +87,12 @@ interface UseTranslatorReturn {
   latencyMetrics: LatencyMetricsType;
   showMetrics: boolean;
   toggleMetrics: () => void;
+  
+  // Language & context settings (Phase 6)
+  sourceLanguage: string;
+  setSourceLanguage: (lang: string) => void;
+  vocabularyContext: string;
+  setVocabularyContext: (context: string) => void;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -129,6 +135,10 @@ export function useTranslator(): UseTranslatorReturn {
     lastUpdateTime: Date.now(),
   });
   const [showMetrics, setShowMetrics] = useState<boolean>(false);
+  
+  // Language & context settings (Phase 6)
+  const [sourceLanguage, setSourceLanguage] = useState<string>('de'); // Default: German
+  const [vocabularyContext, setVocabularyContext] = useState<string>('');
 
   // Refs to maintain state across renders
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -492,10 +502,26 @@ export function useTranslator(): UseTranslatorReturn {
 
       // Step 5: Start translation stream
       console.log('🚀 Starting translation stream...');
+      
+      // Prepare language hints (Phase 6)
+      const languageHints = sourceLanguage === 'auto' 
+        ? ['de', 'en', 'es', 'fr', 'it', 'pt'] // Multi-language
+        : [sourceLanguage];
+      
+      // Prepare context string (Phase 6)
+      const contextString = vocabularyContext.trim().length > 0
+        ? vocabularyContext
+        : undefined;
+      
+      console.log(`🌍 Language hints: ${languageHints.join(', ')}`);
+      if (contextString) {
+        console.log(`📚 Context provided: ${contextString.substring(0, 50)}...`);
+      }
+      
       await client.start({
         model: 'stt-rt-preview-v2',
         
-        // Translation configuration: German → English
+        // Translation configuration: Source → English
         translation: {
           type: 'one_way',
           target_language: 'en',
@@ -505,8 +531,14 @@ export function useTranslator(): UseTranslatorReturn {
         stream: stream,
         audioFormat: 'auto',
 
-        // Language hints for better accuracy
-        languageHints: ['de'], // Primarily German input
+        // Language hints for better accuracy (Phase 6: Dynamic)
+        languageHints,
+        
+        // Enable language identification (Phase 6)
+        enableLanguageIdentification: sourceLanguage === 'auto',
+        
+        // Context/vocabulary hints (Phase 6)
+        ...(contextString && { context: contextString }),
 
         // Enable endpoint detection for better finalization
         enableEndpointDetection: true,
@@ -704,7 +736,7 @@ export function useTranslator(): UseTranslatorReturn {
         mediaStreamRef.current = null;
       }
     }
-  }, [getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers, attemptReconnection]);
+  }, [getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers, attemptReconnection, sourceLanguage, vocabularyContext]);
 
   /**
    * Public start translation function
@@ -843,6 +875,12 @@ export function useTranslator(): UseTranslatorReturn {
     latencyMetrics,
     showMetrics,
     toggleMetrics,
+    
+    // Language & context settings (Phase 6)
+    sourceLanguage,
+    setSourceLanguage,
+    vocabularyContext,
+    setVocabularyContext,
   };
 }
 
