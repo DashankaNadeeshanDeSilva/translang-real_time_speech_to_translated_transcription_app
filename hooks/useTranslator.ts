@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Token,
   processTranslationTokens,
@@ -7,6 +7,8 @@ import {
   generateLineId,
   cleanText,
 } from '@/utils/tokenParser';
+import { VADManager, DEFAULT_VAD_CONFIG } from '@/utils/vadManager';
+import { KeepaliveManager } from '@/utils/keepaliveManager';
 
 /**
  * useTranslator Hook
@@ -58,6 +60,12 @@ interface UseTranslatorReturn {
   // Display options
   showSource: boolean;
   toggleSource: () => void;
+  
+  // VAD configuration (Phase 3)
+  vadEnabled: boolean;
+  toggleVAD: () => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (threshold: number) => void;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -76,6 +84,10 @@ export function useTranslator(): UseTranslatorReturn {
   
   // Display options
   const [showSource, setShowSource] = useState<boolean>(false);
+  
+  // VAD configuration (Phase 3)
+  const [vadEnabled, setVadEnabled] = useState<boolean>(true);
+  const [silenceThreshold, setSilenceThreshold] = useState<number>(DEFAULT_VAD_CONFIG.silenceThreshold);
 
   // Refs to maintain state across renders
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -84,6 +96,12 @@ export function useTranslator(): UseTranslatorReturn {
   // Token buffers (non-final tokens)
   const translationBufferRef = useRef<Token[]>([]);
   const sourceBufferRef = useRef<Token[]>([]);
+  
+  // VAD and Keepalive managers (Phase 3)
+  const vadManagerRef = useRef<VADManager | null>(null);
+  const keepaliveManagerRef = useRef<KeepaliveManager | null>(null);
+  const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   /**
    * Clear transcript and reset state
@@ -103,6 +121,45 @@ export function useTranslator(): UseTranslatorReturn {
    */
   const toggleSource = useCallback(() => {
     setShowSource(prev => !prev);
+  }, []);
+
+  /**
+   * Toggle VAD (Voice Activity Detection)
+   */
+  const toggleVAD = useCallback(() => {
+    setVadEnabled(prev => {
+      const newValue = !prev;
+      console.log(newValue ? '🎙️ VAD enabled' : '🔇 VAD disabled');
+      return newValue;
+    });
+  }, []);
+
+  /**
+   * Cleanup VAD and Keepalive managers
+   */
+  const cleanupManagers = useCallback(async () => {
+    // Stop and cleanup keepalive
+    if (keepaliveManagerRef.current) {
+      keepaliveManagerRef.current.stop();
+      keepaliveManagerRef.current = null;
+    }
+
+    // Destroy and cleanup VAD
+    if (vadManagerRef.current) {
+      await vadManagerRef.current.destroy();
+      vadManagerRef.current = null;
+    }
+
+    // Cleanup audio processing
+    if (audioProcessorRef.current) {
+      audioProcessorRef.current.disconnect();
+      audioProcessorRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      await audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
   }, []);
 
   /**
@@ -160,6 +217,30 @@ export function useTranslator(): UseTranslatorReturn {
 
     // Update live source
     setLiveSource(newLiveSource);
+  }, []);
+
+  /**
+   * Manually finalize current utterance (Phase 3)
+   * Triggers Soniox to finalize non-final tokens
+   */
+  const manualFinalize = useCallback(() => {
+    if (!sonioxClientRef.current) {
+      return;
+    }
+
+    try {
+      console.log('⏸️ Manual finalization triggered');
+      
+      // Check if client has finalize method
+      if (typeof sonioxClientRef.current.finalize === 'function') {
+        sonioxClientRef.current.finalize();
+        console.log('✅ Finalization command sent to Soniox');
+      } else {
+        console.warn('⚠️ Client does not support manual finalization');
+      }
+    } catch (error) {
+      console.error('❌ Error during manual finalization:', error);
+    }
   }, []);
 
   /**
@@ -285,7 +366,29 @@ export function useTranslator(): UseTranslatorReturn {
 
       sonioxClientRef.current = client;
 
-      // Step 4: Start translation stream
+      // Step 4: Initialize VAD and Keepalive (Phase 3)
+      if (vadEnabled) {
+        try {
+          console.log('🎙️ Initializing VAD...');
+          const vadManager = new VADManager({
+            silenceThreshold,
+            sampleRate: 16000,
+          });
+          await vadManager.initialize();
+          vadManagerRef.current = vadManager;
+
+          // Initialize Keepalive manager
+          const keepaliveManager = new KeepaliveManager();
+          keepaliveManager.start(client);
+          keepaliveManagerRef.current = keepaliveManager;
+
+        } catch (vadError) {
+          console.warn('⚠️ VAD initialization failed, continuing without VAD:', vadError);
+          vadManagerRef.current = null;
+        }
+      }
+
+      // Step 5: Start translation stream
       console.log('🚀 Starting translation stream...');
       await client.start({
         model: 'stt-rt-preview-v2',
@@ -311,6 +414,54 @@ export function useTranslator(): UseTranslatorReturn {
           console.log('✅ Translation started successfully');
           setIsConnecting(false);
           setIsRecording(true);
+
+          // Setup VAD audio processing (Phase 3)
+          if (vadEnabled && vadManagerRef.current && mediaStreamRef.current) {
+            try {
+              console.log('🎙️ Setting up VAD audio processing...');
+              
+              // Create audio context for VAD processing
+              const audioContext = new AudioContext({ sampleRate: 16000 });
+              audioContextRef.current = audioContext;
+
+              // Create source from media stream
+              const source = audioContext.createMediaStreamSource(mediaStreamRef.current);
+
+              // Create script processor for VAD
+              const bufferSize = 4096;
+              const processor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+              audioProcessorRef.current = processor;
+
+              processor.onaudioprocess = (event) => {
+                if (!vadManagerRef.current || !sonioxClientRef.current) {
+                  return;
+                }
+
+                const inputData = event.inputBuffer.getChannelData(0);
+                
+                try {
+                  // Process audio frame with VAD
+                  const vadResult = vadManagerRef.current.processFrame(inputData);
+                  
+                  // If silence threshold reached, trigger manual finalization
+                  if (vadResult.shouldFinalize) {
+                    console.log(`⏸️ Silence detected (${vadResult.silenceDuration}ms) - finalizing`);
+                    manualFinalize();
+                  }
+                } catch (vadError) {
+                  console.error('❌ VAD processing error:', vadError);
+                }
+              };
+
+              // Connect audio pipeline
+              source.connect(processor);
+              processor.connect(audioContext.destination);
+
+              console.log('✅ VAD audio processing active');
+            } catch (error) {
+              console.error('❌ Failed to setup VAD audio processing:', error);
+            }
+          }
         },
 
         onPartialResult: (result: TranslatorResult) => {
@@ -345,6 +496,9 @@ export function useTranslator(): UseTranslatorReturn {
           // Finalize any remaining tokens
           finalizeTranscript();
           
+          // Cleanup VAD and Keepalive
+          cleanupManagers();
+          
           setIsRecording(false);
           setIsConnecting(false);
           
@@ -361,6 +515,9 @@ export function useTranslator(): UseTranslatorReturn {
           setIsRecording(false);
           setIsConnecting(false);
           
+          // Cleanup VAD and Keepalive
+          cleanupManagers();
+          
           // Clean up on error
           if (mediaStreamRef.current) {
             mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -375,18 +532,21 @@ export function useTranslator(): UseTranslatorReturn {
       setIsConnecting(false);
       setIsRecording(false);
 
+      // Cleanup VAD and Keepalive
+      await cleanupManagers();
+
       // Clean up on error
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
       }
     }
-  }, [isRecording, isConnecting, getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript]);
+  }, [isRecording, isConnecting, getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers]);
 
   /**
    * Stop translation (graceful)
    */
-  const stopTranslation = useCallback(() => {
+  const stopTranslation = useCallback(async () => {
     if (!sonioxClientRef.current) {
       console.warn('⚠️ No active translation session to stop');
       return;
@@ -396,6 +556,9 @@ export function useTranslator(): UseTranslatorReturn {
     
     // Finalize any remaining tokens before stopping
     finalizeTranscript();
+    
+    // Cleanup VAD and Keepalive
+    await cleanupManagers();
     
     try {
       sonioxClientRef.current.stop();
@@ -410,18 +573,22 @@ export function useTranslator(): UseTranslatorReturn {
     }
 
     sonioxClientRef.current = null;
-  }, [finalizeTranscript]);
+  }, [finalizeTranscript, cleanupManagers]);
 
   /**
    * Cancel translation (abrupt)
    */
-  const cancelTranslation = useCallback(() => {
+  const cancelTranslation = useCallback(async () => {
     if (!sonioxClientRef.current) {
       console.warn('⚠️ No active translation session to cancel');
       return;
     }
 
     console.log('⚠️ Canceling translation...');
+    
+    // Cleanup VAD and Keepalive
+    await cleanupManagers();
+    
     try {
       sonioxClientRef.current.cancel();
     } catch (err) {
@@ -437,7 +604,7 @@ export function useTranslator(): UseTranslatorReturn {
     sonioxClientRef.current = null;
     setIsRecording(false);
     setIsConnecting(false);
-  }, []);
+  }, [cleanupManagers]);
 
   return {
     // Connection state
@@ -462,6 +629,12 @@ export function useTranslator(): UseTranslatorReturn {
     // Display options
     showSource,
     toggleSource,
+    
+    // VAD configuration (Phase 3)
+    vadEnabled,
+    toggleVAD,
+    silenceThreshold,
+    setSilenceThreshold,
   };
 }
 

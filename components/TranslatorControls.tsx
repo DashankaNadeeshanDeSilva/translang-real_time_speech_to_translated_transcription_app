@@ -2,12 +2,13 @@
 
 import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
+import { VADSettings } from './VADSettings';
 
 /**
  * TranslatorControls Component
  * 
  * Provides UI controls for starting/stopping real-time translation.
- * Phase 2: Integrated with TranscriptDisplay for live translation view.
+ * Phase 3: Added VAD settings and improved silence detection.
  */
 
 export function TranslatorControls() {
@@ -25,6 +26,10 @@ export function TranslatorControls() {
     clearTranscript,
     showSource,
     toggleSource,
+    vadEnabled,
+    toggleVAD,
+    silenceThreshold,
+    setSilenceThreshold,
   } = useTranslator();
 
   return (
@@ -62,12 +67,12 @@ export function TranslatorControls() {
         )}
 
         <div style={styles.instructions}>
-          <p><strong>Phase 2: Live Translation Display</strong></p>
+          <p><strong>Phase 3: VAD & Intelligent Finalization</strong></p>
           <p>Click "Start Translation" and speak in German.</p>
-          <p>Your translations will appear in real-time below.</p>
+          <p>Translations auto-finalize during pauses (VAD enabled).</p>
           <p>
-            🟢 Green boxes = Final (confirmed) translation<br />
-            🔵 Blue italic = Live (updating) translation
+            🟢 Green = Final | 🔵 Blue italic = Live<br />
+            {vadEnabled ? `⏸️ Auto-finalize after ${silenceThreshold}ms silence` : '⏸️ VAD disabled'}
           </p>
         </div>
 
@@ -123,6 +128,17 @@ export function TranslatorControls() {
           )}
         </div>
 
+        {/* VAD Settings (Phase 3) */}
+        {!isRecording && (
+          <VADSettings
+            vadEnabled={vadEnabled}
+            toggleVAD={toggleVAD}
+            silenceThreshold={silenceThreshold}
+            setSilenceThreshold={setSilenceThreshold}
+            isRecording={isRecording}
+          />
+        )}
+
         {/* Translation Display */}
         <TranscriptDisplay
           committedTranslation={committedTranslation}
@@ -134,13 +150,14 @@ export function TranslatorControls() {
         />
 
         <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>ℹ️ How it works</h3>
+          <h3 style={styles.infoTitle}>ℹ️ How it works (Phase 3)</h3>
           <ul style={styles.infoList}>
             <li><strong>Green boxes</strong> are final, confirmed translations</li>
             <li><strong>Blue italic text</strong> is live, updating as you speak</li>
+            <li><strong>VAD (Voice Activity Detection)</strong> detects silence and auto-finalizes</li>
             <li>Translations appear with minimal latency (~100-500ms)</li>
+            <li><strong>Keepalive</strong> maintains connection during pauses</li>
             <li>Optional: Toggle "Show German" to see original text</li>
-            <li>Console (F12) still shows detailed token logs for debugging</li>
           </ul>
         </div>
       </div>
@@ -162,7 +179,7 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '1rem',
     padding: '2rem',
-    maxWidth: '600px',
+    maxWidth: '1200px',
     width: '100%',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
   },
