@@ -1,369 +1,202 @@
 # TransLang - Real-Time Speech Translation
 
-**Live Multilingual Speech Translation powered by Soniox AI**
-
-A production-ready Next.js application that captures German speech and translates it to English in real-time with intelligent voice activity detection and beautiful UI.
+A production-ready web application for real-time German-to-English speech translation powered by Soniox AI. Speak naturally and see instant translations with intelligent voice activity detection.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-14.2-black)
 ![React](https://img.shields.io/badge/React-18.3-61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178c6)
 
+## Features
 
-## ✨ Key Features
+- **Real-time Translation**: German to English with sub-500ms latency
+- **Voice Activity Detection**: Automatic finalization during speech pauses
+- **Live Updates**: Watch translations appear as you speak
+- **Dual Display**: View both translated and original text
+- **Smart Token Processing**: Clean transcripts with deduplication
+- **Configurable Sensitivity**: Adjustable silence detection thresholds
+- **Modern UI**: Large, readable text with auto-scroll and color coding
 
-### Translation
-- 🎙️ **Real-time Translation** - German → English with <500ms latency
-- 🟢 **Smart Finalization** - Auto-finalize during pauses (VAD)
-- 🔵 **Live Updates** - See translations as you speak
-- 🟡 **Source Display** - Optional German original text
-- 📝 **Token Deduplication** - Clean, accurate transcripts
+## Prerequisites
 
-### Intelligence (Phase 3)
-- 🤖 **Voice Activity Detection** - Detects speech vs silence
-- ⏸️ **Configurable Thresholds** - Adjust sensitivity (300-2000ms)
-- 💓 **Keepalive** - Maintains connection during pauses
-- 🔄 **Auto-Finalization** - Triggers on silence detection
-- ⚙️ **VAD Settings Panel** - Easy configuration before recording
+- Node.js 18 or higher
+- Soniox API key ([sign up here](https://soniox.com))
+- Modern browser with microphone support (Chrome, Firefox, Edge, Safari)
 
-### User Experience
-- 📏 **Large, Readable UI** - 1600px wide display
-- 📝 **Prominent Text** - 22px translation text (500% larger!)
-- 📜 **Auto-Scroll** - Always see latest translations
-- 🎨 **Beautiful Design** - Modern gradient interface
-- ⚡ **Responsive** - Smooth animations and transitions
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- **Node.js** 18+ 
-- **Soniox API key** - [Get one here](https://soniox.com)
-- **Modern browser** - Chrome, Edge, Firefox (with microphone)
-
-### Installation
+## Installation
 
 ```bash
-# 1. Clone the repository
+# Clone repository
 git clone <your-repo-url>
 cd translang-real_time_speech_to_translated_transcription_app
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Configure environment
+# Configure environment
 cp .env.local.example .env.local
+# Edit .env.local and add: SONIOX_SECRET_KEY=your_api_key_here
 
-# Edit .env.local and add your Soniox API key:
-# SONIOX_SECRET_KEY=your_soniox_api_key_here
-
-# 4. Run development server
+# Start development server
 npm run dev
 
-# 5. Open browser
-# Navigate to http://localhost:3000
+# Open http://localhost:3000
 ```
 
-### First Translation
+## Usage
 
-1. **Allow microphone** access when prompted
-2. **Adjust VAD settings** (optional)
-   - Enable/Disable VAD toggle
-   - Set silence threshold (300-2000ms)
-3. **Click "Start Translation"**
-4. **Speak in German:** "Guten Morgen, wie geht es dir?"
-5. **Watch** real-time English translation appear!
-6. **Pause** briefly to auto-finalize each phrase
+1. **Grant microphone permission** when prompted by your browser
+2. **Configure Voice Activity Detection** (optional):
+   - Toggle VAD on/off
+   - Adjust silence threshold: 300ms (fast) to 2000ms (slow)
+   - Default: 800ms (recommended for natural speech)
+3. **Start Translation** and speak in German
+4. **View results**:
+   - Green boxes: Final translations (confirmed)
+   - Blue italic text: Live translations (updating)
+   - Yellow boxes: Original German text (toggle to show/hide)
+5. **Stop** to end session gracefully or **Cancel** for immediate termination
 
----
+## Tech Stack
 
-## 📖 Usage Guide
+- **Framework**: Next.js 14 with App Router
+- **Language**: TypeScript 5
+- **UI**: React 18
+- **Speech Recognition**: Soniox Speech-to-Text API
+- **Voice Activity Detection**: @echogarden/fvad-wasm
+- **Audio Processing**: Web Audio API, MediaStream
 
-### VAD Settings (Configure Before Starting)
+## Architecture
 
-**Enable/Disable VAD:**
-- **✅ ON** - Auto-finalize during pauses (recommended)
-- **❌ OFF** - Use only Soniox endpoint detection
+The application processes audio through parallel pipelines:
 
-**Silence Threshold Slider:**
-- **Fast (300ms)** - Quick conversations, short phrases
-- **Balanced (800ms)** - Natural speech ⭐ (default)
-- **Slow (1500ms)** - Thoughtful speech, long pauses
-- **Very Slow (2000ms)** - Deliberate speaking
+1. **Audio Capture**: Browser MediaStream API with optimized settings (16kHz, mono, noise suppression)
+2. **Translation Stream**: Soniox WebSocket connection for real-time speech-to-text and translation
+3. **Voice Activity Detection**: Parallel VAD processing for silence detection and auto-finalization
+4. **Token Processing**: Custom parser distinguishes between partial and final translation tokens
+5. **UI Rendering**: React components with auto-scroll and color-coded display
 
-### Translation Display
-
-**Color Coding:**
-- 🟢 **Green Boxes** - Final, confirmed translations (locked)
-- 🔵 **Blue Italic** - Live, updating as you speak
-- 🟡 **Yellow Boxes** - German original (toggle to show)
-
-**Interactive Controls:**
-- **🎤 Start Translation** - Begin capturing and translating
-- **⏹️ Stop** - Gracefully end session (waits for final tokens)
-- **❌ Cancel** - Immediate termination
-- **🗑️ Clear** - Reset all translations
-- **👁️ Show German** / **🙈 Hide German** - Toggle source text
-
----
-
-## 🏗️ Architecture
+## Project Structure
 
 ```
-┌─────────────────┐
-│  Microphone     │ Web Audio API
-└────────┬────────┘
-         │
-    ┌────▼─────┐
-    │ MediaStream │
-    └──┬─────┬──┘
-       │     │
-┌──────▼─┐ ┌▼──────────┐
-│ Soniox │ │ VAD       │ Voice Activity Detection
-│ WebSocket│ │ Manager  │ • Silence detection
-└────┬───┘ └─┬─────────┘ • Auto-finalization
-     │       │
-     └───┬───┘
-         │
-┌────────▼─────────┐
-│ useTranslator    │ State Management
-│    Hook          │ • Token processing
-└────────┬─────────┘ • Line management
-         │
-┌────────▼─────────┐
-│ UI Components    │ Beautiful Display
-│ • TranscriptDisplay  │ • Large text
-│ • VADSettings    │ • Auto-scroll
-│ • Controls       │ • Color-coded
-└──────────────────┘
-```
-
----
-
-## 📁 Project Structure
-
-```
-translang-real_time_speech_to_translated_transcription_app/
 ├── app/
-│   ├── api/
-│   │   └── soniox-temp-key/     # Secure API key endpoint
-│   │       └── route.ts
-│   ├── globals.css               # Global styles & animations
-│   ├── layout.tsx                # Root layout
-│   └── page.tsx                  # Main page
+│   ├── api/soniox-temp-key/    # Secure API key generation
+│   ├── globals.css              # Styles and animations
+│   ├── layout.tsx               # Root layout
+│   └── page.tsx                 # Main page
 ├── components/
-│   ├── TranscriptDisplay.tsx     # Translation display (Phase 2)
-│   ├── TranslatorControls.tsx    # Main control panel
-│   └── VADSettings.tsx           # VAD configuration (Phase 3)
+│   ├── TranscriptDisplay.tsx    # Translation display
+│   ├── TranslatorControls.tsx   # Control panel
+│   └── VADSettings.tsx          # VAD configuration
 ├── hooks/
-│   └── useTranslator.ts          # Translation hook with VAD (Phase 3)
+│   └── useTranslator.ts         # Translation state management
 ├── utils/
-│   ├── tokenParser.ts            # Token processing (Phase 2)
-│   ├── vadManager.ts             # VAD wrapper (Phase 3)
-│   └── keepaliveManager.ts       # Keepalive system (Phase 3)
+│   ├── tokenParser.ts           # Token processing
+│   ├── vadManager.ts            # VAD wrapper
+│   └── keepaliveManager.ts      # Connection keepalive
 ├── types/
-│   └── soniox.ts                 # TypeScript definitions
-├── Documentation/
-│   └── TESTING-GUIDE.md          # Testing instructions
-├── .env.local.example            # Environment template
-├── package.json                  # Dependencies
-└── README.md                     # This file
+│   └── soniox.ts                # TypeScript definitions
+└── deployment/                  # AWS deployment guides
 ```
 
----
+## Available Scripts
 
-## 🔧 Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start development server at `http://localhost:3000` |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
-| `npm run lint` | Check code quality |
+| `npm run lint` | Run ESLint |
 
----
+## Configuration
 
-## 💡 How It Works
+### Environment Variables
 
-### 1. Audio Capture
-- Browser captures microphone via `getUserMedia`
-- Optimized settings: 16kHz, mono, noise suppression
+Create a `.env.local` file:
 
-### 2. Parallel Processing
-- **Soniox SDK** - Streams audio for translation
-- **VAD Manager** - Detects speech/silence in parallel
-
-### 3. Translation
-- Soniox recognizes German speech
-- Translates to English in real-time
-- Sends back tokens (original + translation)
-
-### 4. Token Processing
-- **Final tokens** → Green boxes (committed)
-- **Non-final tokens** → Blue text (live updating)
-- Deduplication prevents repeated text
-
-### 5. VAD Intelligence
-- Detects silence after configurable threshold
-- Triggers manual finalization
-- New tokens start fresh segment
-
-### 6. Display
-- Auto-scroll to latest content
-- Color-coded for easy reading
-- Large, prominent text (22px)
-
----
-
-## 🎨 UI Specifications
-
-### Layout
-- **Container Width:** 1600px (maximized for readability)
-- **Scroll Area:** 500-700px height
-- **Text Size:** 22px (translation), 18px (source)
-- **Line Height:** 2.0 (generous spacing)
-- **Padding:** 1.5rem (comfortable margins)
-
-### Color Scheme
-| Element | Background | Border | Text |
-|---------|-----------|--------|------|
-| **Final Translation** | Light Green | Green 2px | Dark Green |
-| **Live Translation** | Light Blue | Blue 2px | Blue |
-| **Source (German)** | Light Yellow | Yellow 2px | Brown |
-
----
-
-## 🔒 Security
-
-- ✅ API keys stored server-side only (`.env.local`)
-- ✅ Temporary keys for client-side use
-- ✅ Never exposed to browser
-- ✅ Secure WebSocket connections
-- ✅ No data persistence (privacy-first)
-
----
-
-## 🌐 Browser Compatibility
-
-| Browser | Status | Notes |
-|---------|--------|-------|
-| Chrome  | ✅ Recommended | Best performance |
-| Edge    | ✅ Full Support | Chromium-based |
-| Firefox | ✅ Full Support | Excellent |
-| Safari  | ✅ Supported | May need permission settings |
-
-**Requirements:**
-- WebRTC support
-- MediaStream API
-- Web Audio API
-- ES6+ JavaScript
-
----
-
-## 🐛 Troubleshooting
-
-### Microphone Issues
-**Problem:** No audio captured
-**Solutions:**
-1. Check browser permissions (address bar icon)
-2. Ensure mic not used by another app
-3. Try different browser
-4. Check system mic settings
-
-### VAD Not Working
-**Problem:** No auto-finalization
-**Solutions:**
-1. Check VAD is enabled (toggle ON)
-2. Verify silence threshold is reasonable (800ms default)
-3. Speak clearly then pause
-4. Check console (F12) for VAD logs
-
-### Translation Not Appearing
-**Problem:** No text shown
-**Solutions:**
-1. Verify `SONIOX_SECRET_KEY` in `.env.local`
-2. Restart dev server after env changes
-3. Check Soniox API key is valid
-4. Open console for error messages
-
-### High Latency
-**Problem:** Slow translations
-**Solutions:**
-1. Check internet connection
-2. Close unnecessary tabs
-3. Disable browser extensions
-4. Try incognito mode
-
-### Connection Timeouts
-**Problem:** Session disconnects
-**Solutions:**
-1. Keepalive should handle this (Phase 3)
-2. Check network stability
-3. Phase 4 will add reconnection logic
-
----
-
-## 📊 Performance
-
-### Metrics
-- **Latency:** 100-500ms end-to-end
-- **Memory:** ~50-80MB (including VAD)
-- **CPU:** <10% average
-- **Network:** Continuous WebSocket (low bandwidth)
-
-### Optimization
-- Parallel VAD processing (no added latency)
-- Efficient token deduplication
-- React re-render optimization with refs
-- Auto-scroll only on meaningful changes
-
----
-
-## 🚀 Deployment
-
-TransLang can be deployed to AWS using Docker + ECR + ECS Fargate.
-
-### Quick Deploy to AWS:
-
-```bash
-# See deployment/QUICK-START.md for full guide
-
-# 1. Build Docker image
-docker build -t translang:latest .
-
-# 2. Push to AWS ECR
-# (See deployment guides for complete steps)
-
-# 3. Deploy to ECS Fargate
-# (Automated with deploy.sh script)
+```env
+SONIOX_SECRET_KEY=your_soniox_api_key_here
 ```
 
-**📚 Deployment Documentation:**
-- **[QUICK-START.md](deployment/QUICK-START.md)** - Deploy in 30 minutes
-- **[AWS-DEPLOYMENT-GUIDE.md](deployment/AWS-DEPLOYMENT-GUIDE.md)** - Complete guide
-- **[AWS-ARCHITECTURE.md](deployment/AWS-ARCHITECTURE.md)** - Architecture explanation
-- **[MONITORING.md](deployment/MONITORING.md)** - Operations guide
+### Audio Settings
 
-**Cost:** ~$11-33/month on AWS Fargate
+Configured for optimal speech recognition:
+- Sample rate: 16kHz
+- Channels: Mono
+- Echo cancellation: Enabled
+- Noise suppression: Enabled
+- Auto gain control: Enabled
+
+## Security
+
+- API keys stored server-side only
+- Temporary keys generated for client use
+- No sensitive data exposed to browser
+- Secure WebSocket connections
+- No conversation data persistence
+
+## Troubleshooting
+
+**Microphone not working**
+- Check browser permissions in address bar
+- Ensure microphone isn't used by another application
+- Verify system microphone settings
+
+**No translations appearing**
+- Verify `SONIOX_SECRET_KEY` in `.env.local`
+- Restart development server after environment changes
+- Check browser console for errors
+- Confirm API key is valid and active
+
+**High latency**
+- Check internet connection speed
+- Close unnecessary browser tabs
+- Disable browser extensions temporarily
+
+**VAD not detecting pauses**
+- Ensure VAD toggle is enabled
+- Adjust silence threshold (try 800ms default)
+- Speak clearly with natural pauses
+
+## Performance
+
+- **Latency**: 100-500ms end-to-end
+- **Memory**: ~50-80MB including VAD
+- **CPU**: Less than 10% average
+- **Network**: Continuous WebSocket (low bandwidth)
+
+## Deployment
+
+TransLang can be deployed to AWS using Docker, ECR, and ECS Fargate. See the `deployment/` directory for complete guides:
+
+- `deployment/QUICK-START.md` - Deploy in 30 minutes
+- `deployment/AWS-DEPLOYMENT-GUIDE.md` - Comprehensive guide
+- `deployment/AWS-ARCHITECTURE.md` - Infrastructure details
+- `deployment/MONITORING.md` - Operations and monitoring
+
+Estimated AWS cost: $11-33/month
+
+## Browser Compatibility
+
+| Browser | Support |
+|---------|---------|
+| Chrome | Recommended |
+| Edge | Full support |
+| Firefox | Full support |
+| Safari | Supported |
+
+Requires WebRTC, MediaStream API, and Web Audio API support.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Soniox](https://soniox.com/) for speech-to-text and translation API
+- [@echogarden/fvad-wasm](https://www.npmjs.com/package/@echogarden/fvad-wasm) for voice activity detection
+- [Next.js](https://nextjs.org/) and [TypeScript](https://www.typescriptlang.org/) communities
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **[Soniox](https://soniox.com/)** - Powerful speech-to-text and translation API
-- **[@echogarden/fvad-wasm](https://www.npmjs.com/package/@echogarden/fvad-wasm)** - Voice Activity Detection
-- **[Next.js](https://nextjs.org/)** - Excellent React framework
-- **[TypeScript](https://www.typescriptlang.org/)** - Type safety and developer experience
-
----
-
-**Made with ❤️ for real-time communication**
-
-*TransLang - Breaking language barriers, one conversation at a time*
+**TransLang** - Breaking language barriers in real-time
