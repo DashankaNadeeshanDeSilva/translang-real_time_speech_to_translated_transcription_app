@@ -11,6 +11,7 @@ A production-ready web application for real-time speech translation powered by S
 
 - **Real-time Translation**: Spoken language to target language with sub-500ms latency
 - **Voice Activity Detection**: Automatic finalization during speech pauses
+- **Sentence Mode**: Stitch complete sentences for better readability (configurable hold times)
 - **Live Updates**: Watch translations appear as you speak
 - **Dual Display**: View both translated and original text
 - **Smart Token Processing**: Clean transcripts with deduplication
@@ -50,12 +51,16 @@ npm run dev
    - Toggle VAD on/off
    - Adjust silence threshold: 300ms (fast) to 2000ms (slow)
    - Default: 800ms (recommended for natural speech)
-3. **Start Translation** and speak in German
-4. **View results**:
+3. **Configure Sentence Mode** (optional):
+   - Toggle Sentence Mode on/off (default: OFF for fastest display)
+   - Adjust sentence hold time: 300ms (fast) to 900ms (slow)
+   - Default: 600ms (balances readability with speed)
+4. **Start Translation** and speak in German
+5. **View results**:
    - Green boxes: Final translations (confirmed)
    - Blue italic text: Live translations (updating)
    - Yellow boxes: Original German text (toggle to show/hide)
-5. **Stop** to end session gracefully or **Cancel** for immediate termination
+6. **Stop** to end session gracefully or **Cancel** for immediate termination
 
 ## Tech Stack
 
@@ -73,8 +78,9 @@ The application processes audio through parallel pipelines:
 1. **Audio Capture**: Browser MediaStream API with optimized settings (16kHz, mono, noise suppression)
 2. **Translation Stream**: Soniox WebSocket connection for real-time speech-to-text and translation
 3. **Voice Activity Detection**: Parallel VAD processing for silence detection and auto-finalization
-4. **Token Processing**: Custom parser distinguishes between partial and final translation tokens
-5. **UI Rendering**: React components with auto-scroll and color-coded display
+4. **Sentence Stitching**: Optional intelligent buffering to create complete sentences (configurable hold times)
+5. **Token Processing**: Custom parser distinguishes between partial and final translation tokens
+6. **UI Rendering**: React components with auto-scroll and color-coded display
 
 ## Project Structure
 
@@ -87,13 +93,15 @@ The application processes audio through parallel pipelines:
 ├── components/
 │   ├── TranscriptDisplay.tsx    # Translation display
 │   ├── TranslatorControls.tsx   # Control panel
-│   └── VADSettings.tsx          # VAD configuration
+│   ├── VADSettings.tsx          # VAD configuration
+│   └── SentenceSettings.tsx     # Sentence mode configuration
 ├── hooks/
 │   └── useTranslator.ts         # Translation state management
 ├── utils/
 │   ├── tokenParser.ts           # Token processing
 │   ├── vadManager.ts            # VAD wrapper
-│   └── keepaliveManager.ts      # Connection keepalive
+│   ├── keepaliveManager.ts      # Connection keepalive
+│   └── sentenceStitcher.ts      # Sentence stitching logic
 ├── types/
 │   └── soniox.ts                # TypeScript definitions
 └── deployment/                  # AWS deployment guides

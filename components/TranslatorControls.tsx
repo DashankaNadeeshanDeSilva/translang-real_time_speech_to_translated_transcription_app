@@ -8,6 +8,7 @@ import { LatencyMetrics } from './LatencyMetrics';
 import { LanguageSettings } from './LanguageSettings';
 import { ExportControls } from './ExportControls';
 import { BrowserCompatWarning } from './BrowserCompatWarning';
+import { SentenceSettings } from './SentenceSettings';
 
 /**
  * TranslatorControls Component
@@ -46,6 +47,10 @@ export function TranslatorControls() {
     setSourceLanguage,
     vocabularyContext,
     setVocabularyContext,
+    sentenceMode,
+    setSentenceMode,
+    sentenceHoldMs,
+    setSentenceHoldMs,
   } = useTranslator();
 
   return (
@@ -180,6 +185,17 @@ export function TranslatorControls() {
               />
             )}
 
+            {/* Sentence Settings */}
+            {!isRecording && (
+              <SentenceSettings
+                sentenceMode={sentenceMode}
+                setSentenceMode={setSentenceMode}
+                sentenceHoldMs={sentenceHoldMs}
+                setSentenceHoldMs={setSentenceHoldMs}
+                isRecording={isRecording}
+              />
+            )}
+
             {/* Export Controls (Phase 6) */}
             {committedTranslation.length > 0 && (
               <ExportControls
@@ -203,6 +219,7 @@ export function TranslatorControls() {
               <ul style={styles.infoList}>
                 <li><strong>Multi-Language</strong> - 7 languages + auto-detect</li>
                 <li><strong>Smart VAD</strong> - Auto-finalize on silence</li>
+                <li><strong>Sentence Mode</strong> - Stitch complete sentences for better readability</li>
                 <li><strong>Export</strong> - TXT, JSON, SRT formats</li>
                 <li><strong>Auto-Reconnect</strong> - Resilient connection</li>
               </ul>

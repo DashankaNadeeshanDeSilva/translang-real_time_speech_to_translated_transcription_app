@@ -19,6 +19,7 @@ import {
   ErrorType,
 } from '@/utils/errorHandler';
 import { LatencyTracker, LatencyMetrics as LatencyMetricsType } from '@/utils/latencyTracker';
+import { SentenceStitcher } from '@/utils/sentenceStitcher';
 
 /**
  * useTranslator Hook
@@ -93,6 +94,12 @@ interface UseTranslatorReturn {
   setSourceLanguage: (lang: string) => void;
   vocabularyContext: string;
   setVocabularyContext: (context: string) => void;
+  
+  // Sentence stitching settings
+  sentenceMode: boolean;
+  setSentenceMode: (enabled: boolean) => void;
+  sentenceHoldMs: number;
+  setSentenceHoldMs: (ms: number) => void;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -139,6 +146,10 @@ export function useTranslator(): UseTranslatorReturn {
   // Language & context settings (Phase 6)
   const [sourceLanguage, setSourceLanguage] = useState<string>('de'); // Default: German
   const [vocabularyContext, setVocabularyContext] = useState<string>('');
+  
+  // Sentence stitching settings
+  const [sentenceMode, setSentenceMode] = useState<boolean>(false); // Default: OFF
+  const [sentenceHoldMs, setSentenceHoldMs] = useState<number>(600); // Default: 600ms
 
   // Refs to maintain state across renders
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -161,6 +172,9 @@ export function useTranslator(): UseTranslatorReturn {
   
   // Latency tracker (Phase 5)
   const latencyTrackerRef = useRef<LatencyTracker>(new LatencyTracker());
+  
+  // Sentence stitcher
+  const stitcherRef = useRef<SentenceStitcher | null>(null);
 
   /**
    * Clear transcript and reset state
@@ -226,6 +240,12 @@ export function useTranslator(): UseTranslatorReturn {
       await audioContextRef.current.close();
       audioContextRef.current = null;
     }
+
+    // Cleanup sentence stitcher
+    if (stitcherRef.current) {
+      stitcherRef.current.reset();
+      stitcherRef.current = null;
+    }
   }, []);
 
   /**
@@ -252,16 +272,23 @@ export function useTranslator(): UseTranslatorReturn {
     // Update source buffer
     sourceBufferRef.current = updatedSourceBuffer;
 
-    // Commit new final translation text
+    // Commit new final translation text using sentence stitcher
     if (newTranslationText.trim().length > 0) {
       const cleanedText = cleanText(newTranslationText);
-      const newLine: TranscriptLine = {
-        id: generateLineId(),
-        text: cleanedText,
-        timestamp: Date.now(),
-      };
       
-      setCommittedTranslation(prev => [...prev, newLine]);
+      // Use sentence stitcher for final chunks
+      if (stitcherRef.current) {
+        stitcherRef.current.addFinalChunk(cleanedText);
+      } else {
+        // Fallback: direct commit if stitcher not initialized
+        const newLine: TranscriptLine = {
+          id: generateLineId(),
+          text: cleanedText,
+          timestamp: Date.now(),
+        };
+        setCommittedTranslation(prev => [...prev, newLine]);
+      }
+      
       console.log('✅ Committed translation:', cleanedText);
       
       // Track latency for final translations (Phase 5)
@@ -286,8 +313,9 @@ export function useTranslator(): UseTranslatorReturn {
       console.log('✅ Committed source:', cleanedText);
     }
 
-    // Update live translation
-    setLiveTranslation(newLiveTranslation);
+    // Update live translation using sentence stitcher
+    const stitchedLiveText = stitcherRef.current?.getLiveText(newLiveTranslation) || newLiveTranslation;
+    setLiveTranslation(stitchedLiveText);
 
     // Update live source
     setLiveSource(newLiveSource);
@@ -317,6 +345,11 @@ export function useTranslator(): UseTranslatorReturn {
       } else {
         console.warn('⚠️ Client does not support manual finalization');
       }
+      
+      // Flush any pending stitched content
+      if (stitcherRef.current) {
+        stitcherRef.current.flush(true);
+      }
     } catch (error) {
       console.error('❌ Error during manual finalization:', error);
     }
@@ -326,16 +359,28 @@ export function useTranslator(): UseTranslatorReturn {
    * Commit any remaining live tokens when session ends
    */
   const finalizeTranscript = useCallback(() => {
+    // Flush any pending stitched content first
+    if (stitcherRef.current) {
+      stitcherRef.current.flush(true);
+    }
+    
     // Commit remaining translation tokens
     const remainingTranslation = commitRemainingTokens(translationBufferRef.current);
     if (remainingTranslation.trim().length > 0) {
       const cleanedText = cleanText(remainingTranslation);
-      const newLine: TranscriptLine = {
-        id: generateLineId(),
-        text: cleanedText,
-        timestamp: Date.now(),
-      };
-      setCommittedTranslation(prev => [...prev, newLine]);
+      
+      // Use stitcher if available, otherwise direct commit
+      if (stitcherRef.current) {
+        stitcherRef.current.addFinalChunk(cleanedText);
+        stitcherRef.current.flush(true);
+      } else {
+        const newLine: TranscriptLine = {
+          id: generateLineId(),
+          text: cleanedText,
+          timestamp: Date.now(),
+        };
+        setCommittedTranslation(prev => [...prev, newLine]);
+      }
       console.log('✅ Finalized translation:', cleanedText);
     }
 
@@ -478,7 +523,21 @@ export function useTranslator(): UseTranslatorReturn {
 
       sonioxClientRef.current = client;
 
-      // Step 4: Initialize VAD and Keepalive (Phase 3)
+      // Step 4: Initialize Sentence Stitcher
+      stitcherRef.current = new SentenceStitcher((sentence) => {
+        const newLine: TranscriptLine = {
+          id: generateLineId(),
+          text: sentence,
+          timestamp: Date.now(),
+        };
+        setCommittedTranslation((prev) => [...prev, newLine]);
+      }, { 
+        enabled: sentenceMode, 
+        holdMs: sentenceHoldMs, 
+        maxHoldMs: sentenceHoldMs * 2.5 
+      });
+
+      // Step 5: Initialize VAD and Keepalive (Phase 3)
       if (vadEnabled) {
         try {
           console.log('🎙️ Initializing VAD...');
@@ -500,7 +559,7 @@ export function useTranslator(): UseTranslatorReturn {
         }
       }
 
-      // Step 5: Start translation stream
+      // Step 6: Start translation stream
       console.log('🚀 Starting translation stream...');
       
       // Prepare language hints (Phase 6)
@@ -736,7 +795,7 @@ export function useTranslator(): UseTranslatorReturn {
         mediaStreamRef.current = null;
       }
     }
-  }, [getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers, attemptReconnection, sourceLanguage, vocabularyContext]);
+  }, [getMicrophoneAccess, fetchApiKey, handleTokenUpdate, finalizeTranscript, vadEnabled, silenceThreshold, manualFinalize, cleanupManagers, attemptReconnection, sourceLanguage, vocabularyContext, sentenceMode, sentenceHoldMs]);
 
   /**
    * Public start translation function
@@ -881,6 +940,12 @@ export function useTranslator(): UseTranslatorReturn {
     setSourceLanguage,
     vocabularyContext,
     setVocabularyContext,
+    
+    // Sentence stitching settings
+    sentenceMode,
+    setSentenceMode,
+    sentenceHoldMs,
+    setSentenceHoldMs,
   };
 }
 
