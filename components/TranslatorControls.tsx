@@ -51,34 +51,9 @@ export function TranslatorControls() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Real-Time Speech Translation</h2>
-        
         {/* Browser Compatibility Warning (Phase 6) */}
         <BrowserCompatWarning />
         
-        <div style={styles.statusContainer}>
-          <div style={styles.statusBadge}>
-            {isConnecting && (
-              <>
-                <span style={styles.statusDot('#fbbf24')}></span>
-                <span>Connecting...</span>
-              </>
-            )}
-            {isRecording && (
-              <>
-                <span style={styles.statusDot('#10b981')}></span>
-                <span>Recording & Translating</span>
-              </>
-            )}
-            {!isConnecting && !isRecording && (
-              <>
-                <span style={styles.statusDot('#6b7280')}></span>
-                <span>Ready</span>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* Reconnection Banner (Phase 4) */}
         <ReconnectingBanner
           isReconnecting={isReconnecting}
@@ -93,143 +68,181 @@ export function TranslatorControls() {
           </div>
         )}
 
-        <div style={styles.instructions}>
-          <p><strong>Phase 6: Full-Featured Translation</strong></p>
-          <p>Configure language, add vocabulary hints, and export your translations!</p>
-          <p>
-            🟢 Green = Final | 🔵 Blue italic = Live<br />
-            🌍 {sourceLanguage === 'auto' ? 'Auto-detect language' : `Optimized for ${sourceLanguage.toUpperCase()}`}
-            {vocabularyContext && ' • 📚 Custom vocabulary active'}
-          </p>
-        </div>
+        {/* Main Layout: Left (Controls) + Right (Content) */}
+        <div style={styles.mainLayout}>
+          {/* LEFT SIDE: Controls (25%) */}
+          <div style={styles.leftPanel}>
+            {/* Status */}
+            <div style={styles.statusContainer}>
+              <div style={styles.statusBadge}>
+                {isConnecting && (
+                  <>
+                    <span style={styles.statusDot('#fbbf24')}></span>
+                    <span>Connecting...</span>
+                  </>
+                )}
+                {isRecording && (
+                  <>
+                    <span style={styles.statusDot('#10b981')}></span>
+                    <span>Recording & Translating</span>
+                  </>
+                )}
+                {!isConnecting && !isRecording && (
+                  <>
+                    <span style={styles.statusDot('#6b7280')}></span>
+                    <span>Ready</span>
+                  </>
+                )}
+              </div>
+            </div>
 
-        <div style={styles.buttonContainer}>
-          {!isRecording && !isConnecting && (
-            <>
-              <button
-                onClick={startTranslation}
-                style={styles.primaryButton}
-                disabled={isConnecting}
-              >
-                🎤 Start Translation
-              </button>
+            {/* Main Action Buttons */}
+            <div style={styles.buttonContainer}>
+              {!isRecording && !isConnecting && (
+                <>
+                  <button
+                    onClick={startTranslation}
+                    style={styles.primaryButton}
+                    disabled={isConnecting}
+                  >
+                    🎤 Start Translation
+                  </button>
+                  
+                  {committedTranslation.length > 0 && (
+                    <button
+                      onClick={clearTranscript}
+                      style={styles.secondaryButton}
+                    >
+                      🗑️ Clear
+                    </button>
+                  )}
+                </>
+              )}
+              
+              {(isRecording || isConnecting) && (
+                <>
+                  <button
+                    onClick={stopTranslation}
+                    style={styles.stopButton}
+                    disabled={isConnecting}
+                  >
+                    ⏹️ Stop
+                  </button>
+                  
+                  <button
+                    onClick={cancelTranslation}
+                    style={styles.cancelButton}
+                    disabled={isConnecting}
+                  >
+                    ❌ Cancel
+                  </button>
+                </>
+              )}
+              
+              {committedSource.length > 0 && (
+                <button
+                  onClick={toggleSource}
+                  style={styles.toggleButton}
+                >
+                  {showSource ? '🙈 Hide Source' : '👁️ Show Source'}
+                </button>
+              )}
               
               {committedTranslation.length > 0 && (
                 <button
-                  onClick={clearTranscript}
-                  style={styles.secondaryButton}
+                  onClick={toggleMetrics}
+                  style={styles.metricsButton}
                 >
-                  🗑️ Clear
+                  {showMetrics ? '📊 Hide Metrics' : '📈 Show Metrics'}
                 </button>
               )}
-            </>
-          )}
-          
-          {(isRecording || isConnecting) && (
-            <>
-              <button
-                onClick={stopTranslation}
-                style={styles.stopButton}
-                disabled={isConnecting}
-              >
-                ⏹️ Stop
-              </button>
-              
-              <button
-                onClick={cancelTranslation}
-                style={styles.cancelButton}
-                disabled={isConnecting}
-              >
-                ❌ Cancel
-              </button>
-            </>
-          )}
-          
-          {committedSource.length > 0 && (
-            <button
-              onClick={toggleSource}
-              style={styles.toggleButton}
-            >
-              {showSource ? '🙈 Hide German' : '👁️ Show German'}
-            </button>
-          )}
-          
-          {committedTranslation.length > 0 && (
-            <button
-              onClick={toggleMetrics}
-              style={styles.metricsButton}
-            >
-              {showMetrics ? '📊 Hide Metrics' : '📈 Show Metrics'}
-            </button>
-          )}
-        </div>
+            </div>
 
-        {/* Language Settings (Phase 6) */}
-        {!isRecording && (
-          <LanguageSettings
-            sourceLanguage={sourceLanguage}
-            setSourceLanguage={setSourceLanguage}
-            vocabularyContext={vocabularyContext}
-            setVocabularyContext={setVocabularyContext}
-            isRecording={isRecording}
-          />
-        )}
+            {/* Language Settings (Phase 6) */}
+            {!isRecording && (
+              <LanguageSettings
+                sourceLanguage={sourceLanguage}
+                setSourceLanguage={setSourceLanguage}
+                vocabularyContext={vocabularyContext}
+                setVocabularyContext={setVocabularyContext}
+                isRecording={isRecording}
+              />
+            )}
 
-        {/* VAD Settings (Phase 3) */}
-        {!isRecording && (
-          <VADSettings
-            vadEnabled={vadEnabled}
-            toggleVAD={toggleVAD}
-            silenceThreshold={silenceThreshold}
-            setSilenceThreshold={setSilenceThreshold}
-            isRecording={isRecording}
-          />
-        )}
+            {/* VAD Settings (Phase 3) */}
+            {!isRecording && (
+              <VADSettings
+                vadEnabled={vadEnabled}
+                toggleVAD={toggleVAD}
+                silenceThreshold={silenceThreshold}
+                setSilenceThreshold={setSilenceThreshold}
+                isRecording={isRecording}
+              />
+            )}
 
-        {/* Translation Display */}
-        <TranscriptDisplay
-          committedTranslation={committedTranslation}
-          liveTranslation={liveTranslation}
-          committedSource={committedSource}
-          liveSource={liveSource}
-          showSource={showSource}
-          isRecording={isRecording}
-        />
+            {/* Export Controls (Phase 6) */}
+            {committedTranslation.length > 0 && (
+              <ExportControls
+                translations={committedTranslation}
+                source={committedSource}
+                includeSource={showSource}
+              />
+            )}
 
-        {/* Latency Metrics (Phase 5) */}
-        {showMetrics && (
-          <LatencyMetrics
-            metrics={latencyMetrics}
-            isRecording={isRecording}
-          />
-        )}
+            {/* Latency Metrics (Phase 5) */}
+            {showMetrics && (
+              <LatencyMetrics
+                metrics={latencyMetrics}
+                isRecording={isRecording}
+              />
+            )}
 
-        {/* Export Controls (Phase 6) */}
-        {committedTranslation.length > 0 && (
-          <ExportControls
-            translations={committedTranslation}
-            source={committedSource}
-            includeSource={showSource}
-          />
-        )}
+            {/* Feature Info */}
+            <div style={styles.infoBox}>
+              <h3 style={styles.infoTitle}>ℹ️ Features</h3>
+              <ul style={styles.infoList}>
+                <li><strong>Multi-Language</strong> - 7 languages + auto-detect</li>
+                <li><strong>Smart VAD</strong> - Auto-finalize on silence</li>
+                <li><strong>Export</strong> - TXT, JSON, SRT formats</li>
+                <li><strong>Auto-Reconnect</strong> - Resilient connection</li>
+              </ul>
+            </div>
+          </div>
 
-        <div style={styles.infoBox}>
-          <h3 style={styles.infoTitle}>ℹ️ Full Feature Set (Phase 6)</h3>
-          <ul style={styles.infoList}>
-            <li><strong>Multi-Language</strong> - German, Spanish, French, Italian, Portuguese, or Auto-detect</li>
-            <li><strong>Custom Vocabulary</strong> - Add names, terms, acronyms for better accuracy</li>
-            <li><strong>Export</strong> - Download as TXT, JSON, or SRT subtitle format</li>
-            <li><strong>Copy</strong> - One-click copy to clipboard</li>
-            <li><strong>Smart Finalization</strong> - VAD auto-finalizes during pauses</li>
-            <li><strong>Auto-Reconnect</strong> - Resilient connection (up to {maxRetries} attempts)</li>
-          </ul>
+          {/* RIGHT SIDE: Content (75%) */}
+          <div style={styles.rightPanel}>
+            {/* App Header & Intro */}
+            <div style={styles.appHeader}>
+              <h1 style={styles.appTitle}>TransLang</h1>
+              <p style={styles.appIntro}>
+                Real-time speech translation powered by AI. Simply speak and watch your words transform into another language instantly.
+              </p>
+              <div style={styles.statusIndicator}>
+                <span style={styles.statusText}>
+                  🟢 Green = Final | 🔵 Blue italic = Live
+                  {sourceLanguage === 'auto' ? ' | 🌍 Auto-detect' : ` | 🌍 ${sourceLanguage.toUpperCase()}`}
+                  {vocabularyContext && ' | 📚 Custom vocabulary'}
+                </span>
+              </div>
+            </div>
+
+            {/* Translation Display */}
+            <TranscriptDisplay
+              committedTranslation={committedTranslation}
+              liveTranslation={liveTranslation}
+              committedSource={committedSource}
+              liveSource={liveSource}
+              showSource={showSource}
+              isRecording={isRecording}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Inline styles for Phase 1 (will be replaced with proper CSS/Tailwind in Phase 5)
+// Updated styles for new layout
 const styles = {
   container: {
     minHeight: '100vh',
@@ -247,12 +260,52 @@ const styles = {
     width: '100%',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
   },
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
-    marginBottom: '1.5rem',
-    color: '#1f2937',
+  mainLayout: {
+    display: 'flex',
+    gap: '2rem',
+    alignItems: 'flex-start',
+  },
+  leftPanel: {
+    flex: '0 0 25%',
+    minWidth: '300px',
+  },
+  rightPanel: {
+    flex: '1',
+    minWidth: '0',
+  },
+  appHeader: {
+    marginBottom: '2rem',
     textAlign: 'center' as const,
+  },
+  appTitle: {
+    fontSize: '2.5rem',
+    fontWeight: 'bold',
+    marginBottom: '1rem',
+    color: '#1f2937',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  appIntro: {
+    fontSize: '1.125rem',
+    color: '#6b7280',
+    lineHeight: '1.6',
+    marginBottom: '1rem',
+    maxWidth: '600px',
+    margin: '0 auto 1rem auto',
+  },
+  statusIndicator: {
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '0.5rem',
+    padding: '0.75rem 1rem',
+    display: 'inline-block',
+  },
+  statusText: {
+    fontSize: '0.875rem',
+    color: '#64748b',
+    fontWeight: '500',
   },
   statusContainer: {
     display: 'flex',
@@ -285,23 +338,13 @@ const styles = {
     color: '#991b1b',
     fontSize: '0.875rem',
   },
-  instructions: {
-    backgroundColor: '#eff6ff',
-    border: '1px solid #dbeafe',
-    borderRadius: '0.5rem',
-    padding: '1rem',
-    marginBottom: '1.5rem',
-    fontSize: '0.875rem',
-    lineHeight: '1.5',
-  },
   buttonContainer: {
     display: 'flex',
+    flexDirection: 'column' as const,
     gap: '0.75rem',
     marginBottom: '1.5rem',
-    flexWrap: 'wrap' as const,
   },
   primaryButton: {
-    flex: '1',
     padding: '0.75rem 1.5rem',
     backgroundColor: '#10b981',
     color: 'white',
@@ -311,7 +354,7 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    minWidth: '140px',
+    width: '100%',
   },
   secondaryButton: {
     padding: '0.75rem 1rem',
@@ -323,9 +366,9 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    width: '100%',
   },
   stopButton: {
-    flex: '1',
     padding: '0.75rem 1.5rem',
     backgroundColor: '#ef4444',
     color: 'white',
@@ -335,10 +378,9 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    minWidth: '140px',
+    width: '100%',
   },
   cancelButton: {
-    flex: '1',
     padding: '0.75rem 1.5rem',
     backgroundColor: '#f59e0b',
     color: 'white',
@@ -348,7 +390,7 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    minWidth: '140px',
+    width: '100%',
   },
   toggleButton: {
     padding: '0.75rem 1rem',
@@ -360,6 +402,7 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    width: '100%',
   },
   metricsButton: {
     padding: '0.75rem 1rem',
@@ -371,11 +414,13 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    width: '100%',
   },
   infoBox: {
     backgroundColor: '#f9fafb',
     borderRadius: '0.5rem',
     padding: '1rem',
+    marginTop: '1rem',
   },
   infoTitle: {
     fontSize: '0.875rem',
