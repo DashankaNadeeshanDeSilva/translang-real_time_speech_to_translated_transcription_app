@@ -1,6 +1,6 @@
 # TransLang - Real-Time Speech Translation
 
-A production-ready web application for real-time German-to-English speech translation powered by Soniox AI. Speak naturally and see instant translations with intelligent voice activity detection.
+A production-ready web application for real-time speech translation powered by Soniox AI. Speak naturally and see instant translations with intelligent voice activity detection.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-14.2-black)
@@ -9,7 +9,7 @@ A production-ready web application for real-time German-to-English speech transl
 
 ## Features
 
-- **Real-time Translation**: German to English with sub-500ms latency
+- **Real-time Translation**: Spoken language to target language with sub-500ms latency
 - **Voice Activity Detection**: Automatic finalization during speech pauses
 - **Live Updates**: Watch translations appear as you speak
 - **Dual Display**: View both translated and original text
