@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { TranscriptLine } from '@/hooks/useTranslator';
 
 /**
@@ -37,22 +37,53 @@ export function TranscriptDisplay({
 }: TranscriptDisplayProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const prevCommittedLengthRef = useRef(0);
+  const lastScrollHeightRef = useRef(0);
+  const pendingScrollRef = useRef(false);
 
-  // Auto-scroll when new committed lines arrive or live text updates significantly
-  useEffect(() => {
-    const shouldScroll = 
-      committedTranslation.length > prevCommittedLengthRef.current ||
-      (liveTranslation.length > 50 && isRecording);
-
-    if (shouldScroll && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+  // Immediate scroll function that runs synchronously with content changes
+  const scrollToBottom = useCallback((immediate = false) => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const currentScrollHeight = container.scrollHeight;
+      
+      if (immediate) {
+        // Immediate scroll without animation
+        container.scrollTop = currentScrollHeight;
+        lastScrollHeightRef.current = currentScrollHeight;
+      } else {
+        // Smooth scroll for better UX
+        container.scrollTo({
+          top: currentScrollHeight,
+          behavior: 'smooth',
+        });
+        lastScrollHeightRef.current = currentScrollHeight;
+      }
     }
+  }, []);
 
+  // Pre-emptive scroll: scroll immediately when we detect new content
+  const hasNewCommittedContent = committedTranslation.length > prevCommittedLengthRef.current;
+  const hasSignificantLiveContent = liveTranslation.length > 50 && isRecording;
+  
+  if (hasNewCommittedContent || hasSignificantLiveContent) {
+    // Immediate scroll to prepare for new content
+    scrollToBottom(true);
+    pendingScrollRef.current = true;
     prevCommittedLengthRef.current = committedTranslation.length;
-  }, [committedTranslation.length, liveTranslation, isRecording]);
+  }
+
+  // Final scroll after DOM updates (using useEffect for this)
+  useEffect(() => {
+    if (pendingScrollRef.current && scrollContainerRef.current) {
+      // Small delay to ensure DOM is fully updated
+      const timeoutId = setTimeout(() => {
+        scrollToBottom(false);
+        pendingScrollRef.current = false;
+      }, 10); // Very small delay to ensure DOM update
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [committedTranslation.length, liveTranslation, scrollToBottom]);
 
   const hasContent = 
     committedTranslation.length > 0 || 
