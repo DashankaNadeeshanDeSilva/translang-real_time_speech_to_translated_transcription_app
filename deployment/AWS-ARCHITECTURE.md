@@ -1,11 +1,8 @@
 # 🏗️ AWS Architecture Explanation (Beginner-Friendly)
 
-## Why Fargate Over EC2?
+## Why Fargate Over EC2 ?
 
-### Decision: **AWS Fargate** ✅
-
-For TransLang deployment, I recommend **AWS Fargate** instead of EC2. Here's why:
-
+### We recommend **AWS Fargate** ✅ instead of EC2 for TransLang deployment
 ---
 
 ## 🆚 Detailed Comparison
