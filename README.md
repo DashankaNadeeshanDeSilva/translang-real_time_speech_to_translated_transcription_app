@@ -2,6 +2,8 @@
 
 A production-ready web application for real-time speech translation powered by Soniox AI. Speak naturally and see instant translations with intelligent voice activity detection.
 
+*TransLang's intuitive interface with multi-language support, voice activity detection, and real-time translation display*
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-14.2-black)
 ![React](https://img.shields.io/badge/React-18.3-61dafb)
@@ -18,13 +20,13 @@ A production-ready web application for real-time speech translation powered by S
 - **Configurable Sensitivity**: Adjustable silence detection thresholds
 - **Modern UI**: Large, readable text with auto-scroll and color coding
 
-## Prerequisites
 
+## Installation
+
+### Prerequisites:
 - Node.js 18 or higher
 - Soniox API key ([sign up here](https://soniox.com))
 - Modern browser with microphone support (Chrome, Firefox, Edge, Safari)
-
-## Installation
 
 ```bash
 # Clone repository
@@ -82,6 +84,75 @@ The application processes audio through parallel pipelines:
 5. **Token Processing**: Custom parser distinguishes between partial and final translation tokens
 6. **UI Rendering**: React components with auto-scroll and color-coded display
 
+## How it looks
+
+![TransLang Interface](assets/C90F3981-C521-43D3-A22A-283A342D07C6.jpeg)
+
+## Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```env
+SONIOX_SECRET_KEY=your_soniox_api_key_here
+```
+
+## Cloud Deployment (AWS)
+
+TransLang can be deployed to AWS using Docker, ECR, and ECS Fargate. See the `deployment/` directory for complete guides:
+
+- `deployment/QUICK-START.md` - Deploy in 30 minutes
+- `deployment/AWS-DEPLOYMENT-GUIDE.md` - Comprehensive guide
+- `deployment/AWS-ARCHITECTURE.md` - Infrastructure details
+- `deployment/MONITORING.md` - Operations and monitoring
+
+Estimated AWS cost: $11-33/month
+
+## Performance
+
+- **Latency**: 100-500ms end-to-end
+- **Memory**: ~50-80MB including VAD
+- **CPU**: Less than 10% average
+- **Network**: Continuous WebSocket (low bandwidth)
+
+## Security
+
+- API keys stored server-side only
+- Temporary keys generated for client use
+- No sensitive data exposed to browser
+- Secure WebSocket connections
+- No conversation data persistence
+
+## Browser Compatibility
+
+| Browser | Support |
+|---------|---------|
+| Chrome | Recommended |
+| Edge | Full support |
+| Firefox | Full support |
+| Safari | Supported |
+
+Requires WebRTC, MediaStream API, and Web Audio API support.
+
+### Audio Settings
+
+Configured for optimal speech recognition:
+- Sample rate: 16kHz
+- Channels: Mono
+- Echo cancellation: Enabled
+- Noise suppression: Enabled
+- Auto gain control: Enabled
+
 ## Project Structure
 
 ```
@@ -107,42 +178,6 @@ The application processes audio through parallel pipelines:
 └── deployment/                  # AWS deployment guides
 ```
 
-## Available Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env.local` file:
-
-```env
-SONIOX_SECRET_KEY=your_soniox_api_key_here
-```
-
-### Audio Settings
-
-Configured for optimal speech recognition:
-- Sample rate: 16kHz
-- Channels: Mono
-- Echo cancellation: Enabled
-- Noise suppression: Enabled
-- Auto gain control: Enabled
-
-## Security
-
-- API keys stored server-side only
-- Temporary keys generated for client use
-- No sensitive data exposed to browser
-- Secure WebSocket connections
-- No conversation data persistence
-
 ## Troubleshooting
 
 **Microphone not working**
@@ -166,35 +201,6 @@ Configured for optimal speech recognition:
 - Adjust silence threshold (try 800ms default)
 - Speak clearly with natural pauses
 
-## Performance
-
-- **Latency**: 100-500ms end-to-end
-- **Memory**: ~50-80MB including VAD
-- **CPU**: Less than 10% average
-- **Network**: Continuous WebSocket (low bandwidth)
-
-## Deployment
-
-TransLang can be deployed to AWS using Docker, ECR, and ECS Fargate. See the `deployment/` directory for complete guides:
-
-- `deployment/QUICK-START.md` - Deploy in 30 minutes
-- `deployment/AWS-DEPLOYMENT-GUIDE.md` - Comprehensive guide
-- `deployment/AWS-ARCHITECTURE.md` - Infrastructure details
-- `deployment/MONITORING.md` - Operations and monitoring
-
-Estimated AWS cost: $11-33/month
-
-## Browser Compatibility
-
-| Browser | Support |
-|---------|---------|
-| Chrome | Recommended |
-| Edge | Full support |
-| Firefox | Full support |
-| Safari | Supported |
-
-Requires WebRTC, MediaStream API, and Web Audio API support.
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
@@ -205,6 +211,5 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - [@echogarden/fvad-wasm](https://www.npmjs.com/package/@echogarden/fvad-wasm) for voice activity detection
 - [Next.js](https://nextjs.org/) and [TypeScript](https://www.typescriptlang.org/) communities
 
----
 
 **TransLang** - Breaking language barriers in real-time
