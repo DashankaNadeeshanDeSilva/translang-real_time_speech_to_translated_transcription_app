@@ -2,6 +2,7 @@
 
 import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
+import { ChatThread } from './ChatThread';
 import { VADSettings } from './VADSettings';
 import { ReconnectingBanner } from './ReconnectingBanner';
 import { LatencyMetrics } from './LatencyMetrics';
@@ -22,6 +23,7 @@ export function TranslatorControls() {
     isRecording,
     isConnecting,
     error,
+    streamingMessages,
     committedTranslation,
     liveTranslation,
     committedSource,
@@ -52,6 +54,21 @@ export function TranslatorControls() {
     sentenceHoldMs,
     setSentenceHoldMs,
   } = useTranslator();
+
+  // Listen for chat behavior controls
+  if (typeof window !== 'undefined') {
+    window.addEventListener('chat:setGroupingWindow', (e: any) => {
+      const val = Number(e.detail);
+      (window as any).__CHAT_GROUPING_MS = val;
+    });
+    window.addEventListener('chat:setSmooth', (e: any) => {
+      const val = Boolean(e.detail);
+      (window as any).__CHAT_SMOOTH = val;
+    });
+  }
+
+  const groupingWindowMs = (typeof window !== 'undefined' && (window as any).__CHAT_GROUPING_MS) || 4000;
+  const smoothScroll = (typeof window !== 'undefined' && (window as any).__CHAT_SMOOTH) !== false; // default true
 
   return (
     <div style={styles.container}>
@@ -143,6 +160,8 @@ export function TranslatorControls() {
                   </button>
                 </>
               )}
+              
+              {/* Combined mode active - streaming toggle removed */}
               
               {committedSource.length > 0 && (
                 <button
@@ -243,15 +262,16 @@ export function TranslatorControls() {
               </div>
             </div>
 
-            {/* Translation Display */}
-            <TranscriptDisplay
-              committedTranslation={committedTranslation}
-              liveTranslation={liveTranslation}
-              committedSource={committedSource}
-              liveSource={liveSource}
-              showSource={showSource}
-              isRecording={isRecording}
-            />
+            {/* Chat-style unified thread with natural sentence flow + diarization */}
+            <div style={{display:'flex', flexDirection:'column', height:'70vh'}}>
+              <ChatThread 
+                committed={committedTranslation} 
+                liveText={liveTranslation} 
+                isRecording={isRecording}
+                groupingWindowMs={groupingWindowMs}
+                smoothScroll={smoothScroll}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -101,6 +101,35 @@ export function LanguageSettings({
           )}
         </div>
 
+        {/* Chat Behavior Settings */}
+        <div style={styles.setting}>
+          <label style={styles.label}>Chat Behavior</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={styles.helpText}>Grouping window</span>
+            <input
+              type="range"
+              min={1000}
+              max={8000}
+              step={500}
+              defaultValue={4000}
+              onChange={(e) => {
+                window.dispatchEvent(new CustomEvent('chat:setGroupingWindow', { detail: Number(e.currentTarget.value) }));
+              }}
+            />
+            <span style={styles.helpText}>1s – 8s</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <span style={styles.helpText}>Smooth auto-scroll</span>
+            <input
+              type="checkbox"
+              defaultChecked
+              onChange={(e) => {
+                window.dispatchEvent(new CustomEvent('chat:setSmooth', { detail: e.currentTarget.checked }));
+              }}
+            />
+          </div>
+        </div>
+
         {/* Status */}
         {isRecording && (
           <div style={styles.warningBox}>

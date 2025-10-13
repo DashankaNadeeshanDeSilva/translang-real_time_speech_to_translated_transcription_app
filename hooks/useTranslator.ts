@@ -21,6 +21,7 @@ import {
 import { LatencyTracker, LatencyMetrics as LatencyMetricsType } from '@/utils/latencyTracker';
 import { SentenceStitcher } from '@/utils/sentenceStitcher';
 import { TranslationSentenceBuffer } from '@/utils/translationSentenceBuffer';
+import { StreamingTokenProcessor, StreamingMessage, StreamingUpdate } from '@/utils/streamingTokenProcessor';
 
 /**
  * useTranslator Hook
@@ -56,11 +57,13 @@ interface UseTranslatorReturn {
   isConnecting: boolean;
   error: string | null;
   
-  // Translation content
+  // Streaming content (Phase 8.5 - Chat-style)
+  streamingMessages: StreamingMessage[];
+  isStreamingMode: boolean;
+  
+  // Legacy content (for backward compatibility)
   committedTranslation: TranscriptLine[];
   liveTranslation: string;
-  
-  // Source content (optional)
   committedSource: TranscriptLine[];
   liveSource: string;
   
@@ -102,6 +105,9 @@ interface UseTranslatorReturn {
   setSentenceMode: (enabled: boolean) => void;
   sentenceHoldMs: number;
   setSentenceHoldMs: (ms: number) => void;
+  
+  // Streaming mode toggle (Phase 8.5)
+  toggleStreamingMode: () => void;
 }
 
 export function useTranslator(): UseTranslatorReturn {
@@ -110,11 +116,13 @@ export function useTranslator(): UseTranslatorReturn {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Translation content state
+  // Streaming content state (Phase 8.5 - Chat-style)
+  const [streamingMessages, setStreamingMessages] = useState<StreamingMessage[]>([]);
+  const [isStreamingMode, setIsStreamingMode] = useState<boolean>(false); // Default to combined legacy flow
+  
+  // Legacy content state (for backward compatibility)
   const [committedTranslation, setCommittedTranslation] = useState<TranscriptLine[]>([]);
   const [liveTranslation, setLiveTranslation] = useState<string>('');
-  
-  // Source content state (optional German original)
   const [committedSource, setCommittedSource] = useState<TranscriptLine[]>([]);
   const [liveSource, setLiveSource] = useState<string>('');
   
@@ -180,24 +188,36 @@ export function useTranslator(): UseTranslatorReturn {
   
   // Translation sentence buffer (Phase 8 - for natural translation display)
   const translationBufferRef = useRef<TranslationSentenceBuffer | null>(null);
+  
+  // Streaming token processor (Phase 8.5 - Chat-style streaming)
+  const streamingProcessorRef = useRef<StreamingTokenProcessor | null>(null);
 
   /**
    * Clear transcript and reset state
-   * Phase 8: Updated to reset TranslationSentenceBuffer
+   * Phase 8.5: Updated to reset both legacy and streaming systems
    */
   const clearTranscript = useCallback(() => {
+    // Clear legacy state
     setCommittedTranslation([]);
     setLiveTranslation('');
     setCommittedSource([]);
     setLiveSource('');
+    
+    // Clear streaming state
+    setStreamingMessages([]);
     
     // Reset translation sentence buffer (Phase 8)
     if (translationBufferRef.current) {
       translationBufferRef.current.reset();
     }
     
+    // Reset streaming processor (Phase 8.5)
+    if (streamingProcessorRef.current) {
+      streamingProcessorRef.current.reset();
+    }
+    
     sourceBufferRef.current = [];
-    console.log('🗑️ Transcript cleared');
+    console.log('🗑️ Transcript cleared (legacy + streaming)');
   }, []);
 
   /**
@@ -263,14 +283,48 @@ export function useTranslator(): UseTranslatorReturn {
       translationBufferRef.current.reset();
       translationBufferRef.current = null;
     }
+    
+    // Cleanup streaming processor (Phase 8.5)
+    if (streamingProcessorRef.current) {
+      streamingProcessorRef.current.reset();
+      streamingProcessorRef.current = null;
+    }
   }, []);
 
   /**
    * Process incoming tokens and update state
-   * Phase 8: Enhanced with speaker tracking and translation sentence buffering
+   * Phase 8.5: Enhanced with streaming token processor for chat-style display
    */
   const handleTokenUpdate = useCallback((tokens: Token[], audioProcessedMs?: number) => {
-    // Process source tokens (German) - extract speaker info
+    console.log(`🔄 handleTokenUpdate called with ${tokens.length} tokens. isStreamingMode: ${isStreamingMode}, processor exists: ${!!streamingProcessorRef.current}`);
+    
+    // Log token details
+    const translationTokens = tokens.filter(t => t.translation_status === 'translation');
+    const sourceTokens = tokens.filter(t => t.translation_status === 'original');
+    console.log(`   📊 ${translationTokens.length} translation tokens, ${sourceTokens.length} source tokens`);
+    
+    // Process tokens with streaming processor (Phase 8.5)
+    if (streamingProcessorRef.current && isStreamingMode) {
+      console.log(`✨ Using streaming mode - processing tokens...`);
+      streamingProcessorRef.current.processTokens(tokens);
+      
+      // Update messages from streaming processor
+      const messages = streamingProcessorRef.current.getAllMessages();
+      console.log(`📮 Got ${messages.length} messages after processing`);
+      setStreamingMessages(messages);
+      
+      // Mark token received for latency tracking (Phase 5)
+      if (audioProcessedMs !== undefined) {
+        latencyTrackerRef.current.markTokenReceived(audioProcessedMs);
+      }
+      
+      console.log(`✅ Streaming mode processing complete`);
+      return; // Use streaming mode only
+    }
+    
+    console.log(`📝 Using legacy mode - processing tokens...`);
+
+    // Legacy processing (Phase 8) - kept for backward compatibility
     const {
       newCommittedText: newSourceText,
       updatedBuffer: updatedSourceBuffer,
@@ -278,30 +332,31 @@ export function useTranslator(): UseTranslatorReturn {
       currentSpeaker,
     } = processSourceTokens(tokens, sourceBufferRef.current);
 
-    // Update source buffer
     sourceBufferRef.current = updatedSourceBuffer;
 
     // Update current speaker in translation buffer (Phase 8)
+    console.log(`👤 Legacy mode - currentSpeaker from source tokens: ${currentSpeaker}`);
     if (translationBufferRef.current && currentSpeaker) {
       translationBufferRef.current.updateSpeaker(currentSpeaker);
+      console.log(`✅ Updated translation buffer with speaker: ${currentSpeaker}`);
+    } else if (!currentSpeaker) {
+      console.warn(`⚠️ No speaker detected in source tokens`);
     }
 
     // Process translation tokens (English) - Phase 8: Use new buffer system
     const {
       finalTokens,
       nonFinalTokens,
-    } = processTranslationTokens(tokens, []);  // Empty buffer - we use TranslationSentenceBuffer now
+    } = processTranslationTokens(tokens, []);
 
     // Add translation tokens to the sentence buffer (Phase 8)
     if (translationBufferRef.current) {
-      // Combine all translation tokens (both final and non-final)
       const allTranslationTokens = [...finalTokens, ...nonFinalTokens];
       
       if (allTranslationTokens.length > 0) {
         translationBufferRef.current.addTranslationTokens(allTranslationTokens);
       }
       
-      // Get live preview from buffer (includes buffered + partial)
       const livePreview = translationBufferRef.current.getLivePreview(nonFinalTokens);
       setLiveTranslation(livePreview);
     } else {
@@ -345,7 +400,7 @@ export function useTranslator(): UseTranslatorReturn {
     if (audioProcessedMs !== undefined) {
       latencyTrackerRef.current.markTokenReceived(audioProcessedMs);
     }
-  }, []);
+  }, [isStreamingMode]);
 
   /**
    * Manually finalize current utterance (Phase 3)
@@ -368,7 +423,13 @@ export function useTranslator(): UseTranslatorReturn {
         console.warn('⚠️ Client does not support manual finalization');
       }
       
-      // Flush translation sentence buffer (Phase 8)
+      // Commit current streaming message (Phase 8.5)
+      if (streamingProcessorRef.current && isStreamingMode) {
+        streamingProcessorRef.current.commitCurrentMessage();
+        console.log('🔄 Streaming message committed on manual finalize');
+      }
+      
+      // Flush translation sentence buffer (Phase 8 - Legacy)
       if (translationBufferRef.current) {
         translationBufferRef.current.flush(true);
         console.log('🔄 Translation buffer flushed on manual finalize');
@@ -380,10 +441,16 @@ export function useTranslator(): UseTranslatorReturn {
 
   /**
    * Commit any remaining live tokens when session ends
-   * Phase 8: Updated to use TranslationSentenceBuffer
+   * Phase 8.5: Updated to use both streaming and legacy systems
    */
   const finalizeTranscript = useCallback(() => {
-    // Flush translation sentence buffer (Phase 8)
+    // Commit current streaming message (Phase 8.5)
+    if (streamingProcessorRef.current && isStreamingMode) {
+      streamingProcessorRef.current.commitCurrentMessage();
+      console.log('🔄 Streaming message committed on finalize');
+    }
+    
+    // Flush translation sentence buffer (Phase 8 - Legacy)
     if (translationBufferRef.current) {
       translationBufferRef.current.flush(true);
       console.log('🔄 Translation buffer flushed on finalize');
@@ -529,8 +596,39 @@ export function useTranslator(): UseTranslatorReturn {
 
       sonioxClientRef.current = client;
 
-      // Step 4: Initialize Translation Sentence Buffer (Phase 8)
-      // This buffers translation tokens and assembles complete sentences with speaker labels
+      // Step 4: Initialize Streaming Token Processor (Phase 8.5)
+      // This provides chat-style streaming with final/mutable regions
+      streamingProcessorRef.current = new StreamingTokenProcessor(
+        (update: StreamingUpdate) => {
+          console.log(`🎯 StreamingProcessor callback triggered! Type: ${update.type}, Speaker: ${update.speaker}`);
+          
+          // Update messages state when streaming processor updates
+          const messages = streamingProcessorRef.current?.getAllMessages() || [];
+          console.log(`📦 Got ${messages.length} messages from processor`);
+          
+          setStreamingMessages(messages);
+          console.log(`✅ Set streaming messages state with ${messages.length} messages`);
+          
+          console.log(`📝 Streaming update: ${update.type} for ${update.speaker}`);
+          
+          // Track latency for streaming updates (Phase 5)
+          const latency = latencyTrackerRef.current.markDisplayed('translation');
+          if (latency !== null) {
+            console.log(`⏱️ Streaming latency: ${Math.round(latency)}ms`);
+            setLatencyMetrics(latencyTrackerRef.current.getMetrics());
+          }
+        },
+        {
+          enabled: true,
+          maxRollbackTokens: 10,
+          updateThrottleMs: 16, // ~60fps
+          autoCommitOnPause: true,
+          mergeConsecutiveSpeakers: true,
+        }
+      );
+
+      // Step 4b: Initialize Translation Sentence Buffer (Phase 8 - Legacy)
+      // Keep for backward compatibility when streaming mode is disabled
       translationBufferRef.current = new TranslationSentenceBuffer(
         (sentence) => {
           const newLine: TranscriptLine = {
@@ -551,10 +649,10 @@ export function useTranslator(): UseTranslatorReturn {
           }
         },
         {
-          enabled: true,   // Always enabled for natural sentence display
-          holdMs: sentenceHoldMs,      // Align with UI setting
-          maxHoldMs: Math.max(2000, Math.floor(sentenceHoldMs * 3.5)), // adaptive cap
-          maxChars: 500,   // Force commit if sentence exceeds 500 chars
+          enabled: true, // Always enabled - routing controlled by handleTokenUpdate
+          holdMs: sentenceHoldMs,
+          maxHoldMs: Math.max(2000, Math.floor(sentenceHoldMs * 3.5)),
+          maxChars: 500,
         }
       );
 
@@ -924,11 +1022,13 @@ export function useTranslator(): UseTranslatorReturn {
     isConnecting,
     error,
     
-    // Translation content
+    // Streaming content (Phase 8.5 - Chat-style)
+    streamingMessages,
+    isStreamingMode,
+    
+    // Legacy content (for backward compatibility)
     committedTranslation,
     liveTranslation,
-    
-    // Source content
     committedSource,
     liveSource,
     
@@ -970,6 +1070,9 @@ export function useTranslator(): UseTranslatorReturn {
     setSentenceMode,
     sentenceHoldMs,
     setSentenceHoldMs,
+    
+    // Streaming mode toggle (Phase 8.5)
+    toggleStreamingMode: () => setIsStreamingMode(prev => !prev),
   };
 }
 
