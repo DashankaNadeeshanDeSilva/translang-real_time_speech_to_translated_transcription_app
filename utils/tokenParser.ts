@@ -16,6 +16,7 @@ export interface Token {
   start_ms?: number;
   end_ms?: number;
   confidence?: number;
+  speaker?: string;  // Speaker label from diarization (e.g., "1", "2", "3")
 }
 
 export interface TokenBuffer {
@@ -126,6 +127,7 @@ export function processTokenUpdate(
 
 /**
  * Process translation tokens specifically
+ * Returns both final and non-final translation tokens separately
  */
 export function processTranslationTokens(
   allTokens: Token[],
@@ -134,16 +136,30 @@ export function processTranslationTokens(
   newCommittedText: string;
   updatedBuffer: Token[];
   liveText: string;
+  finalTokens: Token[];
+  nonFinalTokens: Token[];
 } {
   // Extract only translation tokens
   const translationTokens = extractTranslationTokens(allTokens);
 
   // Process them
-  return processTokenUpdate(translationTokens, currentNonFinalBuffer);
+  const result = processTokenUpdate(translationTokens, currentNonFinalBuffer);
+  
+  // Split into final and non-final for the new buffering system
+  const { finalTokens, nonFinalTokens } = splitTokensByFinality(translationTokens);
+  
+  return {
+    newCommittedText: result.newCommittedText,
+    updatedBuffer: result.updatedNonFinalBuffer,
+    liveText: result.liveText,
+    finalTokens,
+    nonFinalTokens,
+  };
 }
 
 /**
  * Process source (original) tokens specifically
+ * Also extracts speaker information
  */
 export function processSourceTokens(
   allTokens: Token[],
@@ -152,12 +168,37 @@ export function processSourceTokens(
   newCommittedText: string;
   updatedBuffer: Token[];
   liveText: string;
+  currentSpeaker?: string;
 } {
   // Extract only source tokens
   const sourceTokens = extractSourceTokens(allTokens);
 
   // Process them
-  return processTokenUpdate(sourceTokens, currentNonFinalBuffer);
+  const result = processTokenUpdate(sourceTokens, currentNonFinalBuffer);
+  
+  // Extract current speaker from the tokens
+  const currentSpeaker = extractCurrentSpeaker(sourceTokens);
+  
+  return {
+    newCommittedText: result.newCommittedText,
+    updatedBuffer: result.updatedNonFinalBuffer,
+    liveText: result.liveText,
+    currentSpeaker,
+  };
+}
+
+/**
+ * Extract current speaker from tokens
+ * Returns the most recent speaker label found in the tokens
+ */
+export function extractCurrentSpeaker(tokens: Token[]): string | undefined {
+  // Look for speaker in reverse order (most recent first)
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    if (tokens[i].speaker) {
+      return tokens[i].speaker;
+    }
+  }
+  return undefined;
 }
 
 /**

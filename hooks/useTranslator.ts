@@ -20,6 +20,7 @@ import {
 } from '@/utils/errorHandler';
 import { LatencyTracker, LatencyMetrics as LatencyMetricsType } from '@/utils/latencyTracker';
 import { SentenceStitcher } from '@/utils/sentenceStitcher';
+import { TranslationSentenceBuffer } from '@/utils/translationSentenceBuffer';
 
 /**
  * useTranslator Hook
@@ -46,6 +47,7 @@ export interface TranscriptLine {
   id: string;
   text: string;
   timestamp: number;
+  speaker?: string;  // Speaker label (e.g., "1", "2", "3")
 }
 
 interface UseTranslatorReturn {
@@ -155,8 +157,8 @@ export function useTranslator(): UseTranslatorReturn {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const sonioxClientRef = useRef<any>(null);
   
-  // Token buffers (non-final tokens)
-  const translationBufferRef = useRef<Token[]>([]);
+  // Token buffer for source (non-final tokens)
+  // Translation tokens now handled by TranslationSentenceBuffer (Phase 8)
   const sourceBufferRef = useRef<Token[]>([]);
   
   // VAD and Keepalive managers (Phase 3)
@@ -173,18 +175,27 @@ export function useTranslator(): UseTranslatorReturn {
   // Latency tracker (Phase 5)
   const latencyTrackerRef = useRef<LatencyTracker>(new LatencyTracker());
   
-  // Sentence stitcher
+  // Sentence stitcher (for source text - kept for backward compatibility)
   const stitcherRef = useRef<SentenceStitcher | null>(null);
+  
+  // Translation sentence buffer (Phase 8 - for natural translation display)
+  const translationBufferRef = useRef<TranslationSentenceBuffer | null>(null);
 
   /**
    * Clear transcript and reset state
+   * Phase 8: Updated to reset TranslationSentenceBuffer
    */
   const clearTranscript = useCallback(() => {
     setCommittedTranslation([]);
     setLiveTranslation('');
     setCommittedSource([]);
     setLiveSource('');
-    translationBufferRef.current = [];
+    
+    // Reset translation sentence buffer (Phase 8)
+    if (translationBufferRef.current) {
+      translationBufferRef.current.reset();
+    }
+    
     sourceBufferRef.current = [];
     console.log('🗑️ Transcript cleared');
   }, []);
@@ -246,76 +257,86 @@ export function useTranslator(): UseTranslatorReturn {
       stitcherRef.current.reset();
       stitcherRef.current = null;
     }
+    
+    // Cleanup translation sentence buffer (Phase 8)
+    if (translationBufferRef.current) {
+      translationBufferRef.current.reset();
+      translationBufferRef.current = null;
+    }
   }, []);
 
   /**
    * Process incoming tokens and update state
+   * Phase 8: Enhanced with speaker tracking and translation sentence buffering
    */
   const handleTokenUpdate = useCallback((tokens: Token[], audioProcessedMs?: number) => {
-    // Process translation tokens (English)
-    const {
-      newCommittedText: newTranslationText,
-      updatedBuffer: updatedTranslationBuffer,
-      liveText: newLiveTranslation,
-    } = processTranslationTokens(tokens, translationBufferRef.current);
-
-    // Process source tokens (German)
+    // Process source tokens (German) - extract speaker info
     const {
       newCommittedText: newSourceText,
       updatedBuffer: updatedSourceBuffer,
       liveText: newLiveSource,
+      currentSpeaker,
     } = processSourceTokens(tokens, sourceBufferRef.current);
-
-    // Update translation buffer
-    translationBufferRef.current = updatedTranslationBuffer;
 
     // Update source buffer
     sourceBufferRef.current = updatedSourceBuffer;
 
-    // Commit new final translation text using sentence stitcher
-    if (newTranslationText.trim().length > 0) {
-      const cleanedText = cleanText(newTranslationText);
+    // Update current speaker in translation buffer (Phase 8)
+    if (translationBufferRef.current && currentSpeaker) {
+      translationBufferRef.current.updateSpeaker(currentSpeaker);
+    }
+
+    // Process translation tokens (English) - Phase 8: Use new buffer system
+    const {
+      finalTokens,
+      nonFinalTokens,
+    } = processTranslationTokens(tokens, []);  // Empty buffer - we use TranslationSentenceBuffer now
+
+    // Add translation tokens to the sentence buffer (Phase 8)
+    if (translationBufferRef.current) {
+      // Combine all translation tokens (both final and non-final)
+      const allTranslationTokens = [...finalTokens, ...nonFinalTokens];
       
-      // Use sentence stitcher for final chunks
-      if (stitcherRef.current) {
-        stitcherRef.current.addFinalChunk(cleanedText);
-      } else {
-        // Fallback: direct commit if stitcher not initialized
+      if (allTranslationTokens.length > 0) {
+        translationBufferRef.current.addTranslationTokens(allTranslationTokens);
+      }
+      
+      // Get live preview from buffer (includes buffered + partial)
+      const livePreview = translationBufferRef.current.getLivePreview(nonFinalTokens);
+      setLiveTranslation(livePreview);
+    } else {
+      // Fallback: Old behavior if buffer not initialized
+      const {
+        newCommittedText: newTranslationText,
+        liveText: newLiveTranslation,
+      } = processTranslationTokens(tokens, []);
+
+      if (newTranslationText.trim().length > 0) {
         const newLine: TranscriptLine = {
           id: generateLineId(),
-          text: cleanedText,
+          text: cleanText(newTranslationText),
           timestamp: Date.now(),
+          speaker: currentSpeaker,
         };
         setCommittedTranslation(prev => [...prev, newLine]);
       }
       
-      console.log('✅ Committed translation:', cleanedText);
-      
-      // Track latency for final translations (Phase 5)
-      const latency = latencyTrackerRef.current.markDisplayed('translation');
-      if (latency !== null) {
-        console.log(`⏱️ Translation latency: ${Math.round(latency)}ms`);
-        // Update metrics state
-        setLatencyMetrics(latencyTrackerRef.current.getMetrics());
-      }
+      setLiveTranslation(newLiveTranslation);
     }
 
-    // Commit new final source text
+    // Commit new final source text (with speaker label)
     if (newSourceText.trim().length > 0) {
       const cleanedText = cleanText(newSourceText);
       const newLine: TranscriptLine = {
         id: generateLineId(),
         text: cleanedText,
         timestamp: Date.now(),
+        speaker: currentSpeaker,
       };
       
       setCommittedSource(prev => [...prev, newLine]);
-      console.log('✅ Committed source:', cleanedText);
+      console.log(`✅ Committed source (Speaker ${currentSpeaker || 'unknown'}): ${cleanedText}`);
     }
-
-    // Update live translation using sentence stitcher
-    const stitchedLiveText = stitcherRef.current?.getLiveText(newLiveTranslation) || newLiveTranslation;
-    setLiveTranslation(stitchedLiveText);
 
     // Update live source
     setLiveSource(newLiveSource);
@@ -329,6 +350,7 @@ export function useTranslator(): UseTranslatorReturn {
   /**
    * Manually finalize current utterance (Phase 3)
    * Triggers Soniox to finalize non-final tokens
+   * Phase 8: Updated to flush translation buffer
    */
   const manualFinalize = useCallback(() => {
     if (!sonioxClientRef.current) {
@@ -346,9 +368,10 @@ export function useTranslator(): UseTranslatorReturn {
         console.warn('⚠️ Client does not support manual finalization');
       }
       
-      // Flush any pending stitched content
-      if (stitcherRef.current) {
-        stitcherRef.current.flush(true);
+      // Flush translation sentence buffer (Phase 8)
+      if (translationBufferRef.current) {
+        translationBufferRef.current.flush(true);
+        console.log('🔄 Translation buffer flushed on manual finalize');
       }
     } catch (error) {
       console.error('❌ Error during manual finalization:', error);
@@ -357,52 +380,35 @@ export function useTranslator(): UseTranslatorReturn {
 
   /**
    * Commit any remaining live tokens when session ends
+   * Phase 8: Updated to use TranslationSentenceBuffer
    */
   const finalizeTranscript = useCallback(() => {
-    // Flush any pending stitched content first
-    if (stitcherRef.current) {
-      stitcherRef.current.flush(true);
-    }
-    
-    // Commit remaining translation tokens
-    const remainingTranslation = commitRemainingTokens(translationBufferRef.current);
-    if (remainingTranslation.trim().length > 0) {
-      const cleanedText = cleanText(remainingTranslation);
-      
-      // Use stitcher if available, otherwise direct commit
-      if (stitcherRef.current) {
-        stitcherRef.current.addFinalChunk(cleanedText);
-        stitcherRef.current.flush(true);
-      } else {
-        const newLine: TranscriptLine = {
-          id: generateLineId(),
-          text: cleanedText,
-          timestamp: Date.now(),
-        };
-        setCommittedTranslation(prev => [...prev, newLine]);
-      }
-      console.log('✅ Finalized translation:', cleanedText);
+    // Flush translation sentence buffer (Phase 8)
+    if (translationBufferRef.current) {
+      translationBufferRef.current.flush(true);
+      console.log('🔄 Translation buffer flushed on finalize');
     }
 
     // Commit remaining source tokens
     const remainingSource = commitRemainingTokens(sourceBufferRef.current);
     if (remainingSource.trim().length > 0) {
       const cleanedText = cleanText(remainingSource);
+      const currentSpeaker = translationBufferRef.current?.getCurrentSpeaker();
       const newLine: TranscriptLine = {
         id: generateLineId(),
         text: cleanedText,
         timestamp: Date.now(),
+        speaker: currentSpeaker || undefined,
       };
       setCommittedSource(prev => [...prev, newLine]);
-      console.log('✅ Finalized source:', cleanedText);
+      console.log(`✅ Finalized source (Speaker ${currentSpeaker || 'unknown'}): ${cleanedText}`);
     }
 
     // Clear live text
     setLiveTranslation('');
     setLiveSource('');
 
-    // Clear buffers
-    translationBufferRef.current = [];
+    // Clear source buffer (translation buffer managed by TranslationSentenceBuffer)
     sourceBufferRef.current = [];
   }, []);
 
@@ -523,19 +529,34 @@ export function useTranslator(): UseTranslatorReturn {
 
       sonioxClientRef.current = client;
 
-      // Step 4: Initialize Sentence Stitcher
-      stitcherRef.current = new SentenceStitcher((sentence) => {
-        const newLine: TranscriptLine = {
-          id: generateLineId(),
-          text: sentence,
-          timestamp: Date.now(),
-        };
-        setCommittedTranslation((prev) => [...prev, newLine]);
-      }, { 
-        enabled: sentenceMode, 
-        holdMs: sentenceHoldMs, 
-        maxHoldMs: sentenceHoldMs * 2.5 
-      });
+      // Step 4: Initialize Translation Sentence Buffer (Phase 8)
+      // This buffers translation tokens and assembles complete sentences with speaker labels
+      translationBufferRef.current = new TranslationSentenceBuffer(
+        (sentence) => {
+          const newLine: TranscriptLine = {
+            id: generateLineId(),
+            text: sentence.text,
+            timestamp: Date.now(),
+            speaker: sentence.speaker,
+          };
+          setCommittedTranslation((prev) => [...prev, newLine]);
+          
+          console.log(`✅ Translation sentence committed (Speaker ${sentence.speaker || 'unknown'}): ${sentence.text}`);
+          
+          // Track latency for final translations (Phase 5)
+          const latency = latencyTrackerRef.current.markDisplayed('translation');
+          if (latency !== null) {
+            console.log(`⏱️ Translation latency: ${Math.round(latency)}ms`);
+            setLatencyMetrics(latencyTrackerRef.current.getMetrics());
+          }
+        },
+        {
+          enabled: true,   // Always enabled for natural sentence display
+          holdMs: sentenceHoldMs,      // Align with UI setting
+          maxHoldMs: Math.max(2000, Math.floor(sentenceHoldMs * 3.5)), // adaptive cap
+          maxChars: 500,   // Force commit if sentence exceeds 500 chars
+        }
+      );
 
       // Step 5: Initialize VAD and Keepalive (Phase 3)
       if (vadEnabled) {
@@ -601,6 +622,9 @@ export function useTranslator(): UseTranslatorReturn {
 
         // Enable endpoint detection for better finalization
         enableEndpointDetection: true,
+        
+        // Enable speaker diarization for multi-speaker scenarios (Phase 8)
+        enableSpeakerDiarization: true,
 
         // Callbacks
         onStarted: () => {

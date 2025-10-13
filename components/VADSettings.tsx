@@ -88,7 +88,7 @@ export function VADSettings({
               </>
             ) : (
               <>
-                <strong>⏸️ VAD Disabled:</strong> Using Soniox's automatic endpoint detection only.
+                <strong>⏸️ VAD Disabled:</strong> Using Soniox&apos;s automatic endpoint detection only.
               </>
             )}
           </p>
