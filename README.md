@@ -12,10 +12,12 @@ A production-ready web application for real-time speech translation powered by S
 ## Features
 
 - **Real-time Translation**: Spoken language to target language with sub-500ms latency
+- **Natural Sentence Display**: Complete sentences instead of fragmented pieces (Phase 8)
+- **Speaker Diarization**: Multi-speaker support with automatic speaker tracking and labeling (Phase 8)
 - **Voice Activity Detection**: Automatic finalization during speech pauses
-- **Sentence Mode**: Stitch complete sentences for better readability (configurable hold times)
+- **Intelligent Buffering**: Smart sentence boundary detection for natural reading experience
 - **Live Updates**: Watch translations appear as you speak
-- **Dual Display**: View both translated and original text
+- **Dual Display**: View both translated and original text with speaker labels
 - **Smart Token Processing**: Clean transcripts with deduplication
 - **Configurable Sensitivity**: Adjustable silence detection thresholds
 - **Modern UI**: Large, readable text with auto-scroll and color coding

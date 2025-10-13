@@ -128,7 +128,14 @@ export function TranscriptDisplay({
               {/* Committed translation lines */}
               {committedTranslation.map((line) => (
                 <div key={line.id} style={styles.committedLine}>
-                  {line.text}
+                  {line.speaker && (
+                    <div style={styles.speakerLabel}>
+                      Speaker {line.speaker}
+                    </div>
+                  )}
+                  <div style={styles.lineText}>
+                    {line.text}
+                  </div>
                 </div>
               ))}
 
@@ -149,7 +156,14 @@ export function TranscriptDisplay({
                 {/* Committed source lines */}
                 {committedSource.map((line) => (
                   <div key={line.id} style={styles.committedSourceLine}>
-                    {line.text}
+                    {line.speaker && (
+                      <div style={styles.speakerLabelSource}>
+                        Speaker {line.speaker}
+                      </div>
+                    )}
+                    <div style={styles.lineText}>
+                      {line.text}
+                    </div>
                   </div>
                 ))}
 
@@ -264,13 +278,37 @@ const styles = {
     backgroundColor: '#f0fdf4',
     border: '2px solid #bbf7d0',
     borderRadius: '0.5rem',
-    fontSize: '1.125rem',
-    lineHeight: '1.6',
-    color: '#166534',
     wordWrap: 'break-word' as const,
-    fontWeight: '500' as const,
     animation: 'fadeInUp 0.3s ease-out',
     transition: 'all 0.2s ease',
+  },
+  speakerLabel: {
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    color: '#059669',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+    marginBottom: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  speakerLabelSource: {
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    color: '#b45309',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+    marginBottom: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+  },
+  lineText: {
+    fontSize: '1.125rem',
+    lineHeight: '1.6',
+    color: 'inherit',
+    fontWeight: '500' as const,
   },
   liveLine: {
     padding: '0.875rem 1.125rem',
@@ -295,11 +333,8 @@ const styles = {
     backgroundColor: '#fef3c7',
     border: '2px solid #fde047',
     borderRadius: '0.75rem',
-    fontSize: '1.125rem',
-    lineHeight: '1.75',
     color: '#92400e',
     wordWrap: 'break-word' as const,
-    fontWeight: '500' as const,
   },
   liveSourceLine: {
     padding: '1rem 1.25rem',

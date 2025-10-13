@@ -123,7 +123,7 @@ const styles = {
     height: '1.5rem',
     backgroundColor: '#d1d5db',
     borderRadius: '9999px',
-    position: 'relative',
+    position: 'relative' as const,
     transition: 'background-color 0.2s',
   },
   toggleSliderInner: {
@@ -131,7 +131,7 @@ const styles = {
     height: '1.25rem',
     backgroundColor: 'white',
     borderRadius: '50%',
-    position: 'absolute',
+    position: 'absolute' as const,
     top: '0.125rem',
     left: '0.125rem',
     transition: 'transform 0.2s',
