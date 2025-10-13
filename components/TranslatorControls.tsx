@@ -94,6 +94,20 @@ export function TranslatorControls() {
         <div style={styles.mainLayout}>
           {/* LEFT SIDE: Controls (25%) */}
           <div style={styles.leftPanel}>
+            {/* Legend moved from header */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              marginBottom: '0.75rem',
+              fontSize: '0.8125rem',
+              color: '#374151',
+            }}>
+              <span style={{marginRight: 8}}>🟢 Green = Final</span>
+              <span style={{marginRight: 8}}>🔵 Blue italic = Live</span>
+              <span>🌍 DE</span>
+            </div>
             {/* Status */}
             <div style={styles.statusContainer}>
               <div style={styles.statusBadge}>
@@ -251,15 +265,8 @@ export function TranslatorControls() {
             <div style={styles.appHeader}>
               <h1 style={styles.appTitle}>TransLang</h1>
               <p style={styles.appIntro}>
-                Real-time speech translation powered by AI. Simply speak and watch your words transform into another language instantly.
+                Real-time speech translation. Speak and see natural, diarized English.
               </p>
-              <div style={styles.statusIndicator}>
-                <span style={styles.statusText}>
-                  🟢 Green = Final | 🔵 Blue italic = Live
-                  {sourceLanguage === 'auto' ? ' | 🌍 Auto-detect' : ` | 🌍 ${sourceLanguage.toUpperCase()}`}
-                  {vocabularyContext && ' | 📚 Custom vocabulary'}
-                </span>
-              </div>
             </div>
 
             {/* Chat-style unified thread with natural sentence flow + diarization */}
