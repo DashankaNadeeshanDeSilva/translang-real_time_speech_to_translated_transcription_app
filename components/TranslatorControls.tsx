@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
+import { ChatThread } from './ChatThread';
 import { VADSettings } from './VADSettings';
 import { ReconnectingBanner } from './ReconnectingBanner';
 import { LatencyMetrics } from './LatencyMetrics';
@@ -18,10 +20,14 @@ import { SentenceSettings } from './SentenceSettings';
  */
 
 export function TranslatorControls() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
   const {
     isRecording,
     isConnecting,
     error,
+    streamingMessages,
     committedTranslation,
     liveTranslation,
     committedSource,
@@ -53,6 +59,28 @@ export function TranslatorControls() {
     setSentenceHoldMs,
   } = useTranslator();
 
+  // Listen for chat behavior controls
+  if (typeof window !== 'undefined') {
+    window.addEventListener('chat:setGroupingWindow', (e: any) => {
+      const val = Number(e.detail);
+      (window as any).__CHAT_GROUPING_MS = val;
+    });
+    window.addEventListener('chat:setSmooth', (e: any) => {
+      const val = Boolean(e.detail);
+      (window as any).__CHAT_SMOOTH = val;
+    });
+  }
+
+  const groupingWindowMs = (typeof window !== 'undefined' && (window as any).__CHAT_GROUPING_MS) || 4000;
+  const smoothScroll = (typeof window !== 'undefined' && (window as any).__CHAT_SMOOTH) !== false; // default true
+
+  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    document.documentElement.setAttribute('data-theme', newMode ? 'dark' : 'light');
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -73,10 +101,41 @@ export function TranslatorControls() {
           </div>
         )}
 
+        {/* Top Controls Bar */}
+        <div style={styles.topBar}>
+          <button onClick={toggleSidebar} style={styles.toggleButton}>
+            {sidebarCollapsed ? '☰' : '✕'}
+          </button>
+          <button onClick={toggleTheme} style={styles.themeButton}>
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+
         {/* Main Layout: Left (Controls) + Right (Content) */}
         <div style={styles.mainLayout}>
           {/* LEFT SIDE: Controls (25%) */}
-          <div style={styles.leftPanel}>
+          <div style={{
+            ...styles.leftPanel,
+            width: sidebarCollapsed ? '0' : '25%',
+            minWidth: sidebarCollapsed ? '0' : '300px',
+            opacity: sidebarCollapsed ? 0 : 1,
+            transition: 'all 0.3s ease-in-out',
+            overflow: sidebarCollapsed ? 'hidden' : 'visible',
+          }}>
+            {/* Legend moved from header */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              marginBottom: '0.75rem',
+              fontSize: '0.8125rem',
+              color: '#374151',
+            }}>
+              <span style={{marginRight: 8}}>🟢 Green = Final</span>
+              <span style={{marginRight: 8}}>🔵 Blue italic = Live</span>
+              <span>🌍 DE</span>
+            </div>
             {/* Status */}
             <div style={styles.statusContainer}>
               <div style={styles.statusBadge}>
@@ -144,10 +203,12 @@ export function TranslatorControls() {
                 </>
               )}
               
+              {/* Combined mode active - streaming toggle removed */}
+              
               {committedSource.length > 0 && (
                 <button
                   onClick={toggleSource}
-                  style={styles.toggleButton}
+                  style={styles.sourceToggleButton}
                 >
                   {showSource ? '🙈 Hide Source' : '👁️ Show Source'}
                 </button>
@@ -226,32 +287,39 @@ export function TranslatorControls() {
             </div>
           </div>
 
-          {/* RIGHT SIDE: Content (75%) */}
-          <div style={styles.rightPanel}>
+          {/* RIGHT SIDE: Content - expands when sidebar hidden */}
+          <div style={{
+            ...styles.rightPanel,
+            flex: sidebarCollapsed ? '1' : '1',
+            marginLeft: sidebarCollapsed ? '0' : '0',
+            transition: 'all 0.3s ease-in-out',
+            maxWidth: sidebarCollapsed ? '100%' : '75%',
+          }}>
             {/* App Header & Intro */}
             <div style={styles.appHeader}>
               <h1 style={styles.appTitle}>TransLang</h1>
               <p style={styles.appIntro}>
-                Real-time speech translation powered by AI. Simply speak and watch your words transform into another language instantly.
+                Real-time speech translation.
               </p>
-              <div style={styles.statusIndicator}>
-                <span style={styles.statusText}>
-                  🟢 Green = Final | 🔵 Blue italic = Live
-                  {sourceLanguage === 'auto' ? ' | 🌍 Auto-detect' : ` | 🌍 ${sourceLanguage.toUpperCase()}`}
-                  {vocabularyContext && ' | 📚 Custom vocabulary'}
-                </span>
-              </div>
             </div>
 
-            {/* Translation Display */}
-            <TranscriptDisplay
-              committedTranslation={committedTranslation}
-              liveTranslation={liveTranslation}
-              committedSource={committedSource}
-              liveSource={liveSource}
-              showSource={showSource}
-              isRecording={isRecording}
-            />
+            {/* Chat-style unified thread with natural sentence flow + diarization */}
+            <div style={{
+              display:'flex', 
+              flexDirection:'column', 
+              height:'70vh',
+              width: '100%',
+              maxWidth: sidebarCollapsed ? '100%' : '75%',
+              transition: 'all 0.3s ease-in-out',
+            }}>
+              <ChatThread 
+                committed={committedTranslation} 
+                liveText={liveTranslation} 
+                isRecording={isRecording}
+                groupingWindowMs={groupingWindowMs}
+                smoothScroll={smoothScroll}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -267,20 +335,24 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     padding: '2rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'var(--bg-primary)',
+    transition: 'background-color 0.3s ease',
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: 'var(--bg-secondary)',
     borderRadius: '1rem',
     padding: '2rem',
     maxWidth: '1600px',
     width: '100%',
     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    border: '1px solid var(--border-color)',
+    transition: 'all 0.3s ease',
   },
   mainLayout: {
     display: 'flex',
     gap: '2rem',
     alignItems: 'flex-start',
+    width: '100%',
   },
   leftPanel: {
     flex: '0 0 25%',
@@ -289,6 +361,35 @@ const styles = {
   rightPanel: {
     flex: '1',
     minWidth: '0',
+    width: '100%',
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1rem',
+    padding: '0.5rem 0',
+  },
+  toggleButton: {
+    background: 'var(--accent-primary)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    padding: '0.5rem 1rem',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '600',
+    transition: 'all 0.2s ease',
+  },
+  themeButton: {
+    background: 'var(--accent-secondary)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    padding: '0.5rem 1rem',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    transition: 'all 0.2s ease',
   },
   appHeader: {
     marginBottom: '2rem',
@@ -298,15 +399,15 @@ const styles = {
     fontSize: '2.5rem',
     fontWeight: 'bold',
     marginBottom: '1rem',
-    color: '#1f2937',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'var(--text-primary)',
+    background: 'linear-gradient(135deg, var(--accent-primary) 0%, #764ba2 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
   },
   appIntro: {
     fontSize: '1.125rem',
-    color: '#6b7280',
+    color: 'var(--text-secondary)',
     lineHeight: '1.6',
     marginBottom: '1rem',
     maxWidth: '600px',
@@ -409,7 +510,7 @@ const styles = {
     transition: 'all 0.2s',
     width: '100%',
   },
-  toggleButton: {
+  sourceToggleButton: {
     padding: '0.75rem 1rem',
     backgroundColor: '#8b5cf6',
     color: 'white',

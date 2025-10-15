@@ -121,23 +121,41 @@ export function TranscriptDisplay({
 
         {hasContent && (
           <div style={styles.content}>
-            {/* Translation Lines */}
+            {/* Translation Lines - Grouped by Speaker */}
             <div style={styles.section}>
               <div style={styles.sectionLabel}>English Translation</div>
               
-              {/* Committed translation lines */}
-              {committedTranslation.map((line) => (
-                <div key={line.id} style={styles.committedLine}>
-                  {line.speaker && (
-                    <div style={styles.speakerLabel}>
-                      Speaker {line.speaker}
+              {/* Group translations by speaker */}
+              {(() => {
+                const speakerGroups = new Map<string, TranscriptLine[]>();
+                
+                // Group committed lines by speaker
+                committedTranslation.forEach(line => {
+                  const speaker = line.speaker || 'unknown';
+                  if (!speakerGroups.has(speaker)) {
+                    speakerGroups.set(speaker, []);
+                  }
+                  speakerGroups.get(speaker)!.push(line);
+                });
+                
+                // Render each speaker's box
+                return Array.from(speakerGroups.entries()).map(([speaker, lines]) => (
+                  <div key={speaker} style={styles.speakerBox}>
+                    <div style={styles.speakerHeader}>
+                      <span style={styles.speakerIcon}>👤</span>
+                      <span style={styles.speakerName}>Speaker {speaker}</span>
+                      <span style={styles.lineCount}>{lines.length} line{lines.length !== 1 ? 's' : ''}</span>
                     </div>
-                  )}
-                  <div style={styles.lineText}>
-                    {line.text}
+                    <div style={styles.speakerContent}>
+                      {lines.map(line => (
+                        <div key={line.id} style={styles.committedLine}>
+                          {line.text}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
 
               {/* Live translation line */}
               {liveTranslation && (
@@ -148,24 +166,42 @@ export function TranscriptDisplay({
               )}
             </div>
 
-            {/* Source Lines (optional) */}
+            {/* Source Lines (optional) - Grouped by Speaker */}
             {showSource && (committedSource.length > 0 || liveSource) && (
               <div style={styles.section}>
                 <div style={styles.sectionLabel}>German Original</div>
                 
-                {/* Committed source lines */}
-                {committedSource.map((line) => (
-                  <div key={line.id} style={styles.committedSourceLine}>
-                    {line.speaker && (
-                      <div style={styles.speakerLabelSource}>
-                        Speaker {line.speaker}
+                {/* Group source by speaker */}
+                {(() => {
+                  const speakerGroups = new Map<string, TranscriptLine[]>();
+                  
+                  // Group committed source lines by speaker
+                  committedSource.forEach(line => {
+                    const speaker = line.speaker || 'unknown';
+                    if (!speakerGroups.has(speaker)) {
+                      speakerGroups.set(speaker, []);
+                    }
+                    speakerGroups.get(speaker)!.push(line);
+                  });
+                  
+                  // Render each speaker's box
+                  return Array.from(speakerGroups.entries()).map(([speaker, lines]) => (
+                    <div key={speaker} style={styles.speakerBox}>
+                      <div style={styles.speakerHeader}>
+                        <span style={styles.speakerIcon}>👤</span>
+                        <span style={styles.speakerName}>Speaker {speaker}</span>
+                        <span style={styles.lineCount}>{lines.length} line{lines.length !== 1 ? 's' : ''}</span>
                       </div>
-                    )}
-                    <div style={styles.lineText}>
-                      {line.text}
+                      <div style={styles.speakerContent}>
+                        {lines.map(line => (
+                          <div key={line.id} style={styles.committedSourceLine}>
+                            {line.text}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ));
+                })()}
 
                 {/* Live source line */}
                 {liveSource && (
@@ -272,6 +308,46 @@ const styles = {
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
     marginBottom: '0.25rem',
+  },
+  speakerBox: {
+    marginBottom: '1rem',
+    border: '2px solid #e5e7eb',
+    borderRadius: '0.75rem',
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+  },
+  speakerHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.75rem 1rem',
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  speakerIcon: {
+    fontSize: '1rem',
+  },
+  speakerName: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+  },
+  lineCount: {
+    fontSize: '0.75rem',
+    color: '#6b7280',
+    backgroundColor: '#f1f5f9',
+    padding: '0.25rem 0.5rem',
+    borderRadius: '0.375rem',
+  },
+  speakerContent: {
+    padding: '0.75rem',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '0.5rem',
+    maxHeight: '300px',
+    overflowY: 'auto' as const,
   },
   committedLine: {
     padding: '0.875rem 1.125rem',
