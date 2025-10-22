@@ -7,6 +7,7 @@ import { ChatThread } from './ChatThread';
 import { ReconnectingBanner } from './ReconnectingBanner';
 import { LatencyMetrics } from './LatencyMetrics';
 import { BrowserCompatWarning } from './BrowserCompatWarning';
+import { ExportDialog } from './ExportDialog';
 import { Mic, Square, Pause, Play, Eye, EyeOff, BarChart3, Trash2 } from 'lucide-react';
 
 /**
@@ -21,11 +22,12 @@ interface TranslatorControlsProps {
 }
 
 export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {}) {
-  const [isPaused, setIsPaused] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   
   const {
     isRecording,
     isConnecting,
+    isPaused,
     error,
     streamingMessages,
     committedTranslation,
@@ -35,6 +37,8 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
     startTranslation,
     stopTranslation,
     cancelTranslation,
+    pauseTranslation,
+    resumeTranslation,
     clearTranscript,
     showSource,
     toggleSource,
@@ -61,21 +65,26 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
 
   // Handle pause/resume
   const handlePauseResume = () => {
-    setIsPaused(!isPaused);
-    // TODO: Implement actual pause/resume logic in the audio stream
+    if (isPaused) {
+      resumeTranslation();
+    } else {
+      pauseTranslation();
+    }
   };
 
   // Handle stop (end session)
   const handleStop = () => {
     stopTranslation();
     onSessionEnd?.(true);
-    setIsPaused(false);
+    // Show export dialog if there are translations
+    if (committedTranslation.length > 0) {
+      setShowExportDialog(true);
+    }
   };
 
   // Reset session state when starting new translation
   const handleStart = async () => {
     onSessionEnd?.(false);
-    setIsPaused(false);
     await startTranslation();
   };
 
@@ -83,6 +92,7 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
   const handleClear = () => {
     clearTranscript();
     onSessionEnd?.(false);
+    setShowExportDialog(false);
   };
 
   // Listen for chat behavior controls
@@ -103,6 +113,15 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
 
   return (
     <div className="w-full h-full">
+      {/* Export Dialog */}
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        translations={committedTranslation}
+        source={committedSource}
+        includeSource={showSource}
+      />
+
       {/* Browser Compatibility Warning (Phase 6) */}
       <BrowserCompatWarning />
       
@@ -132,10 +151,16 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
                     <span className="text-sm text-muted-foreground">Connecting...</span>
                   </>
                 )}
-                {isRecording && (
+                {isRecording && !isPaused && (
                   <>
                     <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
                     <span className="text-sm text-muted-foreground">Recording & Translating</span>
+                  </>
+                )}
+                {isRecording && isPaused && (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                    <span className="text-sm text-muted-foreground">Paused</span>
                   </>
                 )}
                 {!isConnecting && !isRecording && (

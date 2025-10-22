@@ -55,6 +55,7 @@ interface UseTranslatorReturn {
   // Connection state
   isRecording: boolean;
   isConnecting: boolean;
+  isPaused: boolean;
   error: string | null;
   
   // Streaming content (Phase 8.5 - Chat-style)
@@ -71,6 +72,8 @@ interface UseTranslatorReturn {
   startTranslation: () => Promise<void>;
   stopTranslation: () => void;
   cancelTranslation: () => void;
+  pauseTranslation: () => void;
+  resumeTranslation: () => void;
   clearTranscript: () => void;
   
   // Display options
@@ -114,6 +117,7 @@ export function useTranslator(): UseTranslatorReturn {
   // Connection state
   const [isRecording, setIsRecording] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Streaming content state (Phase 8.5 - Chat-style)
@@ -191,6 +195,9 @@ export function useTranslator(): UseTranslatorReturn {
   
   // Streaming token processor (Phase 8.5 - Chat-style streaming)
   const streamingProcessorRef = useRef<StreamingTokenProcessor | null>(null);
+  
+  // Pause state ref (for callbacks to check current pause state)
+  const isPausedRef = useRef<boolean>(false);
 
   /**
    * Clear transcript and reset state
@@ -296,6 +303,12 @@ export function useTranslator(): UseTranslatorReturn {
    * Phase 8.5: Enhanced with streaming token processor for chat-style display
    */
   const handleTokenUpdate = useCallback((tokens: Token[], audioProcessedMs?: number) => {
+    // Skip processing if paused
+    if (isPausedRef.current) {
+      console.log('⏸️ Ignoring tokens - translation is paused');
+      return;
+    }
+    
     console.log(`🔄 handleTokenUpdate called with ${tokens.length} tokens. isStreamingMode: ${isStreamingMode}, processor exists: ${!!streamingProcessorRef.current}`);
     
     // Log token details
@@ -943,6 +956,9 @@ export function useTranslator(): UseTranslatorReturn {
   const stopTranslation = useCallback(async () => {
     console.log('🛑 Stopping translation gracefully...');
     
+    // Reset pause ref
+    isPausedRef.current = false;
+    
     // Cancel any pending retries (Phase 4)
     retryManagerRef.current.cancel();
     setIsReconnecting(false);
@@ -976,6 +992,7 @@ export function useTranslator(): UseTranslatorReturn {
     sonioxClientRef.current = null;
     setIsRecording(false);
     setIsConnecting(false);
+    setIsPaused(false);
   }, [finalizeTranscript, cleanupManagers, isReconnecting]);
 
   /**
@@ -983,6 +1000,9 @@ export function useTranslator(): UseTranslatorReturn {
    */
   const cancelTranslation = useCallback(async () => {
     console.log('⚠️ Canceling translation...');
+    
+    // Reset pause ref
+    isPausedRef.current = false;
     
     // Cancel any pending retries (Phase 4)
     retryManagerRef.current.cancel();
@@ -1014,12 +1034,150 @@ export function useTranslator(): UseTranslatorReturn {
     sonioxClientRef.current = null;
     setIsRecording(false);
     setIsConnecting(false);
+    setIsPaused(false);
   }, [cleanupManagers, isReconnecting]);
+
+  /**
+   * Pause translation (mute microphone)
+   */
+  const pauseTranslation = useCallback(() => {
+    console.log('⏸️ Pausing translation...');
+    
+    if (!isRecording || isPaused) {
+      console.warn('⚠️ Cannot pause - not recording or already paused');
+      return;
+    }
+    
+    // Set pause ref to prevent token callbacks from processing
+    isPausedRef.current = true;
+    
+    // First, finalize any pending tokens in the Soniox client
+    if (sonioxClientRef.current && typeof sonioxClientRef.current.finalize === 'function') {
+      try {
+        sonioxClientRef.current.finalize();
+        console.log('🔒 Finalized pending tokens');
+      } catch (err) {
+        console.error('❌ Error finalizing tokens on pause:', err);
+      }
+    }
+    
+    // CRITICAL: Stop the audio processor to prevent buffering
+    if (audioProcessorRef.current && audioProcessorRef.current.onaudioprocess) {
+      // Disconnect the processor from receiving audio data
+      audioProcessorRef.current.disconnect();
+      console.log('🔌 Audio processor disconnected');
+      audioProcessorRef.current = null;
+    }
+    
+    // Mute all audio tracks to stop audio capture completely
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = false;
+        console.log('🔇 Audio track disabled');
+      });
+    }
+    
+    // Stop the audio context to prevent any buffering
+    if (audioContextRef.current) {
+      if (audioContextRef.current.state === 'running') {
+        audioContextRef.current.suspend().then(() => {
+          console.log('⏸️ Audio context suspended');
+        }).catch(err => {
+          console.error('❌ Failed to suspend audio context:', err);
+        });
+      } else if (audioContextRef.current.state === 'suspended') {
+        console.log('⏸️ Audio context already suspended');
+      }
+    }
+    
+    setIsPaused(true);
+    console.log('✅ Translation paused - audio processing stopped');
+  }, [isRecording, isPaused]);
+
+  /**
+   * Resume translation (unmute microphone)
+   */
+  const resumeTranslation = useCallback(() => {
+    console.log('▶️ Resuming translation...');
+    
+    if (!isRecording || !isPaused) {
+      console.warn('⚠️ Cannot resume - not recording or not paused');
+      return;
+    }
+    
+    // Clear pause ref to allow token callbacks to process again
+    isPausedRef.current = false;
+    
+    // Re-enable all audio tracks to resume audio capture
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = true;
+        console.log('🔊 Audio track enabled');
+      });
+    }
+    
+    // Resume audio context
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().then(() => {
+        console.log('▶️ Audio context resumed');
+      }).catch(err => {
+        console.error('❌ Failed to resume audio context:', err);
+      });
+    }
+    
+    // Recreate audio processor if it was disconnected
+    if (vadEnabled && mediaStreamRef.current && audioContextRef.current && !audioProcessorRef.current) {
+      try {
+        console.log('🔄 Recreating audio processor after pause...');
+        
+        // Create source from media stream
+        const source = audioContextRef.current.createMediaStreamSource(mediaStreamRef.current);
+        
+        // Create script processor for VAD
+        const bufferSize = 4096;
+        const processor = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
+        audioProcessorRef.current = processor;
+        
+        processor.onaudioprocess = (event) => {
+          if (!vadManagerRef.current || !sonioxClientRef.current) {
+            return;
+          }
+          
+          const inputData = event.inputBuffer.getChannelData(0);
+          
+          try {
+            // Process audio frame with VAD
+            const vadResult = vadManagerRef.current.processFrame(inputData);
+            
+            // If silence threshold reached, trigger manual finalization
+            if (vadResult.shouldFinalize) {
+              console.log(`⏸️ Silence detected (${vadResult.silenceDuration}ms) - finalizing`);
+              manualFinalize();
+            }
+          } catch (vadError) {
+            console.error('❌ VAD processing error:', vadError);
+          }
+        };
+        
+        // Connect audio pipeline
+        source.connect(processor);
+        processor.connect(audioContextRef.current.destination);
+        
+        console.log('✅ Audio processor recreated');
+      } catch (error) {
+        console.error('❌ Failed to recreate audio processor:', error);
+      }
+    }
+    
+    setIsPaused(false);
+    console.log('✅ Translation resumed - audio processing restarted');
+  }, [isRecording, isPaused, vadEnabled, manualFinalize]);
 
   return {
     // Connection state
     isRecording,
     isConnecting,
+    isPaused,
     error,
     
     // Streaming content (Phase 8.5 - Chat-style)
@@ -1036,6 +1194,8 @@ export function useTranslator(): UseTranslatorReturn {
     startTranslation,
     stopTranslation,
     cancelTranslation,
+    pauseTranslation,
+    resumeTranslation,
     clearTranscript,
     
     // Display options
