@@ -4,13 +4,10 @@ import { useState } from 'react';
 import { useTranslator } from '@/hooks/useTranslator';
 import { TranscriptDisplay } from './TranscriptDisplay';
 import { ChatThread } from './ChatThread';
-import { VADSettings } from './VADSettings';
 import { ReconnectingBanner } from './ReconnectingBanner';
 import { LatencyMetrics } from './LatencyMetrics';
-import { LanguageSettings } from './LanguageSettings';
-import { ExportControls } from './ExportControls';
 import { BrowserCompatWarning } from './BrowserCompatWarning';
-import { SentenceSettings } from './SentenceSettings';
+import { Mic, Square, Pause, Play, Eye, EyeOff, BarChart3, Trash2 } from 'lucide-react';
 
 /**
  * TranslatorControls Component
@@ -19,9 +16,12 @@ import { SentenceSettings } from './SentenceSettings';
  * Phase 4: Added reconnection handling and error recovery.
  */
 
-export function TranslatorControls() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+interface TranslatorControlsProps {
+  onSessionEnd?: (hasEnded: boolean) => void;
+}
+
+export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {}) {
+  const [isPaused, setIsPaused] = useState(false);
   
   const {
     isRecording,
@@ -59,6 +59,32 @@ export function TranslatorControls() {
     setSentenceHoldMs,
   } = useTranslator();
 
+  // Handle pause/resume
+  const handlePauseResume = () => {
+    setIsPaused(!isPaused);
+    // TODO: Implement actual pause/resume logic in the audio stream
+  };
+
+  // Handle stop (end session)
+  const handleStop = () => {
+    stopTranslation();
+    onSessionEnd?.(true);
+    setIsPaused(false);
+  };
+
+  // Reset session state when starting new translation
+  const handleStart = async () => {
+    onSessionEnd?.(false);
+    setIsPaused(false);
+    await startTranslation();
+  };
+
+  // Handle clear transcript
+  const handleClear = () => {
+    clearTranscript();
+    onSessionEnd?.(false);
+  };
+
   // Listen for chat behavior controls
   if (typeof window !== 'undefined') {
     window.addEventListener('chat:setGroupingWindow', (e: any) => {
@@ -74,254 +100,130 @@ export function TranslatorControls() {
   const groupingWindowMs = (typeof window !== 'undefined' && (window as any).__CHAT_GROUPING_MS) || 4000;
   const smoothScroll = (typeof window !== 'undefined' && (window as any).__CHAT_SMOOTH) !== false; // default true
 
-  const toggleSidebar = () => setSidebarCollapsed(!sidebarCollapsed);
-  const toggleTheme = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    document.documentElement.setAttribute('data-theme', newMode ? 'dark' : 'light');
-  };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        {/* Browser Compatibility Warning (Phase 6) */}
-        <BrowserCompatWarning />
-        
-        {/* Reconnection Banner (Phase 4) */}
-        <ReconnectingBanner
-          isReconnecting={isReconnecting}
-          retryCount={retryCount}
-          maxRetries={maxRetries}
-          errorMessage={reconnectionMessage}
-        />
+    <div className="w-full h-full">
+      {/* Browser Compatibility Warning (Phase 6) */}
+      <BrowserCompatWarning />
+      
+      {/* Reconnection Banner (Phase 4) */}
+      <ReconnectingBanner
+        isReconnecting={isReconnecting}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
+        errorMessage={reconnectionMessage}
+      />
 
-        {error && !isReconnecting && (
-          <div style={styles.errorBox}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {/* Top Controls Bar */}
-        <div style={styles.topBar}>
-          <button onClick={toggleSidebar} style={styles.toggleButton}>
-            {sidebarCollapsed ? '☰' : '✕'}
-          </button>
-          <button onClick={toggleTheme} style={styles.themeButton}>
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+      {error && !isReconnecting && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <strong>Error:</strong> {error}
         </div>
+      )}
 
-        {/* Main Layout: Left (Controls) + Right (Content) */}
-        <div style={styles.mainLayout}>
-          {/* LEFT SIDE: Controls (25%) */}
-          <div style={{
-            ...styles.leftPanel,
-            width: sidebarCollapsed ? '0' : '25%',
-            minWidth: sidebarCollapsed ? '0' : '300px',
-            opacity: sidebarCollapsed ? 0 : 1,
-            transition: 'all 0.3s ease-in-out',
-            overflow: sidebarCollapsed ? 'hidden' : 'visible',
-          }}>
-            {/* Legend moved from header */}
-            <div style={{
-              background: '#ffffff',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              marginBottom: '0.75rem',
-              fontSize: '0.8125rem',
-              color: '#374151',
-            }}>
-              <span style={{marginRight: 8}}>🟢 Green = Final</span>
-              <span style={{marginRight: 8}}>🔵 Blue italic = Live</span>
-              <span>🌍 DE</span>
-            </div>
-            {/* Status */}
-            <div style={styles.statusContainer}>
-              <div style={styles.statusBadge}>
+      {/* Main Content - Full Width */}
+      <div className="w-full">
+          {/* Status Bar */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
                 {isConnecting && (
                   <>
-                    <span style={styles.statusDot('#fbbf24')}></span>
-                    <span>Connecting...</span>
+                    <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse"></span>
+                    <span className="text-sm text-muted-foreground">Connecting...</span>
                   </>
                 )}
                 {isRecording && (
                   <>
-                    <span style={styles.statusDot('#10b981')}></span>
-                    <span>Recording & Translating</span>
+                    <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-sm text-muted-foreground">Recording & Translating</span>
                   </>
                 )}
                 {!isConnecting && !isRecording && (
                   <>
-                    <span style={styles.statusDot('#6b7280')}></span>
-                    <span>Ready</span>
+                    <span className="h-2 w-2 rounded-full bg-gray-400"></span>
+                    <span className="text-sm text-muted-foreground">Ready</span>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Main Action Buttons */}
-            <div style={styles.buttonContainer}>
+            {/* Control Buttons */}
+            <div className="flex items-center gap-2">
               {!isRecording && !isConnecting && (
-                <>
-                  <button
-                    onClick={startTranslation}
-                    style={styles.primaryButton}
-                    disabled={isConnecting}
-                  >
-                    🎤 Start Translation
-                  </button>
-                  
-                  {committedTranslation.length > 0 && (
-                    <button
-                      onClick={clearTranscript}
-                      style={styles.secondaryButton}
-                    >
-                      🗑️ Clear
-                    </button>
-                  )}
-                </>
+                <button
+                  onClick={handleStart}
+                  disabled={isConnecting}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <Mic size={16} />
+                  Start Translation
+                </button>
               )}
               
               {(isRecording || isConnecting) && (
                 <>
                   <button
-                    onClick={stopTranslation}
-                    style={styles.stopButton}
+                    onClick={handlePauseResume}
                     disabled={isConnecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
                   >
-                    ⏹️ Stop
+                    {isPaused ? (
+                      <>
+                        <Play size={16} />
+                        Resume
+                      </>
+                    ) : (
+                      <>
+                        <Pause size={16} />
+                        Pause
+                      </>
+                    )}
                   </button>
                   
                   <button
-                    onClick={cancelTranslation}
-                    style={styles.cancelButton}
+                    onClick={handleStop}
                     disabled={isConnecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
                   >
-                    ❌ Cancel
+                    <Square size={16} />
+                    Stop
                   </button>
                 </>
               )}
-              
-              {/* Combined mode active - streaming toggle removed */}
-              
-              {committedSource.length > 0 && (
+
+              {committedTranslation.length > 0 && !isRecording && (
                 <button
-                  onClick={toggleSource}
-                  style={styles.sourceToggleButton}
+                  onClick={handleClear}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
                 >
-                  {showSource ? '🙈 Hide Source' : '👁️ Show Source'}
-                </button>
-              )}
-              
-              {committedTranslation.length > 0 && (
-                <button
-                  onClick={toggleMetrics}
-                  style={styles.metricsButton}
-                >
-                  {showMetrics ? '📊 Hide Metrics' : '📈 Show Metrics'}
+                  <Trash2 size={16} />
+                  Clear
                 </button>
               )}
             </div>
+          </div>
 
-            {/* Language Settings (Phase 6) */}
-            {!isRecording && (
-              <LanguageSettings
-                sourceLanguage={sourceLanguage}
-                setSourceLanguage={setSourceLanguage}
-                vocabularyContext={vocabularyContext}
-                setVocabularyContext={setVocabularyContext}
-                isRecording={isRecording}
-              />
-            )}
+          {/* Chat-style unified thread - Full Width */}
+          <div className="flex flex-col rounded-lg border bg-card overflow-hidden" style={{ maxHeight: '80vh', height: '80vh' }}>
+            <ChatThread 
+              committed={committedTranslation} 
+              liveText={liveTranslation} 
+              isRecording={isRecording}
+              groupingWindowMs={groupingWindowMs}
+              smoothScroll={smoothScroll}
+            />
+          </div>
 
-            {/* VAD Settings (Phase 3) */}
-            {!isRecording && (
-              <VADSettings
-                vadEnabled={vadEnabled}
-                toggleVAD={toggleVAD}
-                silenceThreshold={silenceThreshold}
-                setSilenceThreshold={setSilenceThreshold}
-                isRecording={isRecording}
-              />
-            )}
 
-            {/* Sentence Settings */}
-            {!isRecording && (
-              <SentenceSettings
-                sentenceMode={sentenceMode}
-                setSentenceMode={setSentenceMode}
-                sentenceHoldMs={sentenceHoldMs}
-                setSentenceHoldMs={setSentenceHoldMs}
-                isRecording={isRecording}
-              />
-            )}
-
-            {/* Export Controls (Phase 6) */}
-            {committedTranslation.length > 0 && (
-              <ExportControls
-                translations={committedTranslation}
-                source={committedSource}
-                includeSource={showSource}
-              />
-            )}
-
-            {/* Latency Metrics (Phase 5) */}
-            {showMetrics && (
+          {/* Latency Metrics - Optional */}
+          {showMetrics && (
+            <div className="mt-4">
               <LatencyMetrics
                 metrics={latencyMetrics}
                 isRecording={isRecording}
               />
-            )}
-
-            {/* Feature Info */}
-            <div style={styles.infoBox}>
-              <h3 style={styles.infoTitle}>ℹ️ Features</h3>
-              <ul style={styles.infoList}>
-                <li><strong>Multi-Language</strong> - 7 languages + auto-detect</li>
-                <li><strong>Smart VAD</strong> - Auto-finalize on silence</li>
-                <li><strong>Sentence Mode</strong> - Stitch complete sentences for better readability</li>
-                <li><strong>Export</strong> - TXT, JSON, SRT formats</li>
-                <li><strong>Auto-Reconnect</strong> - Resilient connection</li>
-              </ul>
             </div>
-          </div>
-
-          {/* RIGHT SIDE: Content - expands when sidebar hidden */}
-          <div style={{
-            ...styles.rightPanel,
-            flex: sidebarCollapsed ? '1' : '1',
-            marginLeft: sidebarCollapsed ? '0' : '0',
-            transition: 'all 0.3s ease-in-out',
-            maxWidth: sidebarCollapsed ? '100%' : '75%',
-          }}>
-            {/* App Header & Intro */}
-            <div style={styles.appHeader}>
-              <h1 style={styles.appTitle}>TransLang</h1>
-              <p style={styles.appIntro}>
-                Real-time speech translation.
-              </p>
-            </div>
-
-            {/* Chat-style unified thread with natural sentence flow + diarization */}
-            <div style={{
-              display:'flex', 
-              flexDirection:'column', 
-              height:'70vh',
-              width: '100%',
-              maxWidth: sidebarCollapsed ? '100%' : '75%',
-              transition: 'all 0.3s ease-in-out',
-            }}>
-              <ChatThread 
-                committed={committedTranslation} 
-                liveText={liveTranslation} 
-                isRecording={isRecording}
-                groupingWindowMs={groupingWindowMs}
-                smoothScroll={smoothScroll}
-              />
-            </div>
-          </div>
-        </div>
+          )}
       </div>
     </div>
   );
@@ -348,20 +250,9 @@ const styles = {
     border: '1px solid var(--border-color)',
     transition: 'all 0.3s ease',
   },
-  mainLayout: {
-    display: 'flex',
-    gap: '2rem',
-    alignItems: 'flex-start',
+  fullWidthContainer: {
     width: '100%',
-  },
-  leftPanel: {
-    flex: '0 0 25%',
-    minWidth: '300px',
-  },
-  rightPanel: {
-    flex: '1',
-    minWidth: '0',
-    width: '100%',
+    maxWidth: '100%',
   },
   topBar: {
     display: 'flex',

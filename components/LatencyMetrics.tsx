@@ -1,5 +1,7 @@
 'use client';
 
+import { Activity } from 'lucide-react';
+
 import { LatencyMetrics as LatencyMetricsType, formatLatency, getLatencyColor, getLatencyEmoji } from '@/utils/latencyTracker';
 
 /**
@@ -38,7 +40,10 @@ export function LatencyMetrics({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h4 style={styles.title}>📊 Performance Metrics</h4>
+        <h4 style={styles.title} className="flex items-center gap-2">
+          <Activity size={18} />
+          Performance Metrics
+        </h4>
         {isRecording && (
           <span style={styles.liveIndicator}>
             <span style={styles.liveDot}></span>

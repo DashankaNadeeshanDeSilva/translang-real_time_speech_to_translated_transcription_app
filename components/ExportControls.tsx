@@ -11,6 +11,7 @@ import {
   generateFilename,
   getTranscriptStats,
 } from '@/utils/exportUtils';
+import { FileText, FileJson, Copy, Check, Download } from 'lucide-react';
 
 /**
  * Export Controls Component
@@ -130,7 +131,10 @@ export function ExportControls({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h4 style={styles.title}>💾 Export & Share</h4>
+        <h4 style={styles.title} className="flex items-center gap-2">
+          <Download size={18} />
+          Export & Share
+        </h4>
         {stats && (
           <div style={styles.stats}>
             {stats.totalLines} lines • {stats.totalWords} words
@@ -145,24 +149,30 @@ export function ExportControls({
             onClick={handleExportTXT}
             style={styles.exportButton}
             title="Export as plain text file"
+            className="flex items-center justify-center gap-2"
           >
-            📄 Export TXT
+            <FileText size={16} />
+            Export TXT
           </button>
           
           <button
             onClick={handleExportJSON}
             style={styles.exportButton}
             title="Export as JSON with metadata"
+            className="flex items-center justify-center gap-2"
           >
-            📋 Export JSON
+            <FileJson size={16} />
+            Export JSON
           </button>
           
           <button
             onClick={handleExportSRT}
             style={styles.exportButton}
             title="Export as SRT subtitle file"
+            className="flex items-center justify-center gap-2"
           >
-            🎬 Export SRT
+            <FileText size={16} />
+            Export SRT
           </button>
           
           <button
@@ -176,11 +186,22 @@ export function ExportControls({
             }}
             disabled={copyStatus === 'copying'}
             title="Copy transcript to clipboard"
+            className="flex items-center justify-center gap-2"
           >
-            {copyStatus === 'idle' && '📋 Copy'}
-            {copyStatus === 'copying' && '⏳ Copying...'}
-            {copyStatus === 'success' && '✅ Copied!'}
-            {copyStatus === 'error' && '❌ Failed'}
+            {copyStatus === 'idle' && (
+              <>
+                <Copy size={16} />
+                Copy
+              </>
+            )}
+            {copyStatus === 'copying' && 'Copying...'}
+            {copyStatus === 'success' && (
+              <>
+                <Check size={16} />
+                Copied!
+              </>
+            )}
+            {copyStatus === 'error' && 'Failed'}
           </button>
         </div>
 
