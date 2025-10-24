@@ -710,7 +710,8 @@ export function useTranslator(): UseTranslatorReturn {
       }
       
       await client.start({
-        model: 'stt-rt-preview-v2',
+        model: 'stt-rt-v3',
+        //model: 'stt-rt-preview-v2',
         
         // Translation configuration: Source → English
         translation: {
