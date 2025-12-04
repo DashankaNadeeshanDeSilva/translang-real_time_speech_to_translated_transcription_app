@@ -9,7 +9,10 @@ import { LatencyMetrics } from './LatencyMetrics';
 import { BrowserCompatWarning } from './BrowserCompatWarning';
 import { ExportDialog } from './ExportDialog';
 import { SaveTranscriptButton } from './dashboard/SaveTranscriptButton';
+import { UsageLimitDialog } from './dashboard/UsageLimitDialog';
 import { Mic, Square, Pause, Play, Eye, EyeOff, BarChart3, Trash2 } from 'lucide-react';
+import { UsageStats } from '@/lib/usageTracker';
+import { useEffect } from 'react';
 
 /**
  * TranslatorControls Component
@@ -24,6 +27,9 @@ interface TranslatorControlsProps {
 
 export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {}) {
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [showUsageDialog, setShowUsageDialog] = useState(false);
+  const [pendingStart, setPendingStart] = useState(false);
   
   const {
     isRecording,
@@ -83,8 +89,51 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
     }
   };
 
+  // Check usage before starting
+  useEffect(() => {
+    loadUsageStats();
+  }, []);
+
+  const loadUsageStats = async () => {
+    try {
+      const response = await fetch('/api/usage');
+      if (response.ok) {
+        const data = await response.json();
+        setUsageStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Failed to load usage stats:', err);
+    }
+  };
+
   // Reset session state when starting new translation
   const handleStart = async () => {
+    // Check usage limits first
+    if (!usageStats) {
+      await loadUsageStats();
+    }
+    
+    // If over limit, block start
+    if (usageStats?.isOverLimit) {
+      setShowUsageDialog(true);
+      return;
+    }
+    
+    // If near limit (>80%), show warning but allow continue
+    if (usageStats && usageStats.percentUsed >= 80) {
+      setPendingStart(true);
+      setShowUsageDialog(true);
+      return;
+    }
+    
+    // Otherwise, start normally
+    onSessionEnd?.(false);
+    await startTranslation();
+  };
+
+  // Continue after warning
+  const handleContinueAfterWarning = async () => {
+    setPendingStart(false);
     onSessionEnd?.(false);
     await startTranslation();
   };
@@ -258,6 +307,16 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
             </div>
           )}
       </div>
+
+      {/* Usage Limit Dialog */}
+      {usageStats && (
+        <UsageLimitDialog
+          open={showUsageDialog}
+          onOpenChange={setShowUsageDialog}
+          stats={usageStats}
+          onContinue={pendingStart ? handleContinueAfterWarning : undefined}
+        />
+      )}
     </div>
   );
 }

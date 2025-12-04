@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { Separator } from '@/components/ui/separator';
 import { useTranslator } from '@/hooks/useTranslator';
 import { UserMenu } from '@/components/auth/UserMenu';
+import { UsageIndicator } from '@/components/dashboard/UsageIndicator';
 import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -74,8 +75,11 @@ export default function DashboardPage() {
             <h1 className="text-lg font-semibold">Real-Time Translation</h1>
           </div>
           
-          {/* User Menu */}
-          <UserMenu user={user} />
+          {/* Usage & User Menu */}
+          <div className="flex items-center gap-2">
+            <UsageIndicator />
+            <UserMenu user={user} />
+          </div>
         </header>
         <main className="flex flex-1 flex-col p-6 bg-white dark:bg-background h-[calc(100vh-4rem)]">
           <TranslatorControls onSessionEnd={setHasSessionEnded} />

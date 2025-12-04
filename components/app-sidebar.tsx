@@ -19,6 +19,7 @@ import {
   Sun,
   Download,
   FileText,
+  BarChart3,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from './theme-provider';
@@ -107,6 +108,13 @@ export function AppSidebar({
             >
               <FileText className="h-4 w-4" />
               Transcripts
+            </Link>
+            <Link
+              href="/dashboard/usage"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Usage
             </Link>
           </SidebarGroupContent>
         </SidebarGroup>

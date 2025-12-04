@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Auth0Provider } from '@auth0/nextjs-auth0';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'TransLang - Real-Time Speech Translation',
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <Auth0Provider>
-          <ThemeProvider defaultTheme="system" storageKey="translang-theme">
-            {children}
-          </ThemeProvider>
-        </Auth0Provider>
+        <ErrorBoundary>
+          <Auth0Provider>
+            <ThemeProvider defaultTheme="system" storageKey="translang-theme">
+              {children}
+            </ThemeProvider>
+          </Auth0Provider>
+        </ErrorBoundary>
       </body>
     </html>
   );

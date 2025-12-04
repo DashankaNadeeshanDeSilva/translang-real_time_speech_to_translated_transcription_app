@@ -22,6 +22,7 @@ import { LatencyTracker, LatencyMetrics as LatencyMetricsType } from '@/utils/la
 import { SentenceStitcher } from '@/utils/sentenceStitcher';
 import { TranslationSentenceBuffer } from '@/utils/translationSentenceBuffer';
 import { StreamingTokenProcessor, StreamingMessage, StreamingUpdate } from '@/utils/streamingTokenProcessor';
+import { SessionTracker, msToMinutes } from '@/lib/usageTracker';
 
 /**
  * useTranslator Hook
@@ -198,6 +199,9 @@ export function useTranslator(): UseTranslatorReturn {
   
   // Pause state ref (for callbacks to check current pause state)
   const isPausedRef = useRef<boolean>(false);
+  
+  // Usage tracking (Phase 4)
+  const sessionTrackerRef = useRef<SessionTracker>(new SessionTracker());
 
   /**
    * Clear transcript and reset state
@@ -948,6 +952,10 @@ export function useTranslator(): UseTranslatorReturn {
     setRetryCount(0);
     setIsReconnecting(false);
     
+    // Start usage tracking
+    sessionTrackerRef.current.start();
+    console.log('⏱️ Started usage tracking');
+    
     await startTranslationInternal();
   }, [isRecording, isConnecting, startTranslationInternal]);
 
@@ -956,6 +964,25 @@ export function useTranslator(): UseTranslatorReturn {
    */
   const stopTranslation = useCallback(async () => {
     console.log('🛑 Stopping translation gracefully...');
+    
+    // Stop usage tracking and record
+    const elapsedMs = sessionTrackerRef.current.stop();
+    const minutes = msToMinutes(elapsedMs);
+    console.log(`⏱️ Session duration: ${minutes.toFixed(2)} minutes`);
+    
+    // Record usage to database
+    if (minutes > 0.01) { // Only record if more than ~1 second
+      try {
+        await fetch('/api/usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ minutes }),
+        });
+        console.log('✅ Usage recorded successfully');
+      } catch (err) {
+        console.error('❌ Failed to record usage:', err);
+      }
+    }
     
     // Reset pause ref
     isPausedRef.current = false;
@@ -1049,6 +1076,10 @@ export function useTranslator(): UseTranslatorReturn {
       return;
     }
     
+    // Pause usage tracking
+    sessionTrackerRef.current.pause();
+    console.log('⏱️ Paused usage tracking');
+    
     // Set pause ref to prevent token callbacks from processing
     isPausedRef.current = true;
     
@@ -1105,6 +1136,10 @@ export function useTranslator(): UseTranslatorReturn {
       console.warn('⚠️ Cannot resume - not recording or not paused');
       return;
     }
+    
+    // Resume usage tracking
+    sessionTrackerRef.current.resume();
+    console.log('⏱️ Resumed usage tracking');
     
     // Clear pause ref to allow token callbacks to process again
     isPausedRef.current = false;
