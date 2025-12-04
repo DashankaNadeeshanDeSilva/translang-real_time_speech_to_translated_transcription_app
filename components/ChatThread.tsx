@@ -79,8 +79,8 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
     const el = containerRef.current;
     if (!el) return;
 
-    // Scroll only if user is near bottom
-    if (isNearBottom()) {
+    // Always scroll to bottom when recording or near bottom
+    if (isRecording || isNearBottom()) {
       if (smoothScroll) {
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
       } else {
@@ -98,6 +98,17 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
     }
   }, [messages.length, isRecording, smoothScroll]);
 
+  // Force scroll to bottom when recording starts
+  useEffect(() => {
+    if (isRecording) {
+      const el = containerRef.current;
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      });
+    }
+  }, [isRecording]);
+
   const handleJumpToPresent = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -107,45 +118,21 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
   }, []);
 
   return (
-    <div ref={containerRef} style={styles.container}>
-      <div style={styles.list}>
+    <div ref={containerRef} className="h-full overflow-y-auto p-6 bg-transparent">
+      <div className="flex flex-col">
         {messages.map(m => (
           <ChatMessage key={m.id} msg={m} />
         ))}
       </div>
 
       {showJump && (
-        <div style={styles.jumpPill} onClick={handleJumpToPresent}>
+        <div 
+          onClick={handleJumpToPresent}
+          className="sticky bottom-4 mx-auto w-fit bg-primary text-primary-foreground px-4 py-2 rounded-full cursor-pointer shadow-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+        >
           {hasUnread ? 'New messages — Jump to present' : 'Jump to present'}
         </div>
       )}
     </div>
   );
 }
-
-const styles = {
-  container: {
-    height: '100%',
-    overflowY: 'auto' as const,
-    padding: '1rem',
-    backgroundColor: 'transparent',
-  },
-  list: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.5rem',
-  },
-  jumpPill: {
-    position: 'sticky' as const,
-    bottom: '0.75rem',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    width: 'fit-content',
-    backgroundColor: '#2563eb',
-    color: 'white',
-    padding: '0.5rem 0.75rem',
-    borderRadius: '9999px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-  },
-};

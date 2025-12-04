@@ -31,7 +31,7 @@ export function PerformanceSettings({
             <li>Audio Format: <strong>Auto</strong> (Soniox detects)</li>
             <li>Buffer Size: <strong>4096 samples</strong> (VAD processing)</li>
             <li>Endpoint Detection: <strong>Enabled</strong></li>
-            <li>Model: <strong>stt-rt-preview-v2</strong> (latest)</li>
+            <li>Model: <strong>stt-rt-v3</strong> (latest)</li>
           </ul>
         </div>
 

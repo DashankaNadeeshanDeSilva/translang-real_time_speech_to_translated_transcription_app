@@ -1,13 +1,34 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Globe, BookOpen, MessageSquare, CheckCircle2, AlertCircle } from 'lucide-react';
 
 /**
  * Language Settings Component
  * 
- * Allows users to configure source language and provide vocabulary hints.
+ * Improved UI with three collapsible sections:
+ * 1. Source Languages - Select dropdown for language selection
+ * 2. Vocabulary & Context Hints - Textarea for custom vocabulary
+ * 3. Chat Behavior - Settings for grouping window and smooth scroll
  * 
- * Phase 6 Implementation
+ * Uses Shadcn UI components for a modern, clean interface
  */
 
 interface LanguageSettingsProps {
@@ -16,6 +37,14 @@ interface LanguageSettingsProps {
   vocabularyContext: string;
   setVocabularyContext: (context: string) => void;
   isRecording: boolean;
+  vadEnabled: boolean;
+  toggleVAD: () => void;
+  silenceThreshold: number;
+  setSilenceThreshold: (threshold: number) => void;
+  sentenceMode: boolean;
+  setSentenceMode: (enabled: boolean) => void;
+  sentenceHoldMs: number;
+  setSentenceHoldMs: (ms: number) => void;
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -34,225 +63,249 @@ export function LanguageSettings({
   vocabularyContext,
   setVocabularyContext,
   isRecording,
+  vadEnabled,
+  toggleVAD,
+  silenceThreshold,
+  setSilenceThreshold,
+  sentenceMode,
+  setSentenceMode,
+  sentenceHoldMs,
+  setSentenceHoldMs,
 }: LanguageSettingsProps) {
-  const [showVocabularyInput, setShowVocabularyInput] = useState(false);
+  const [groupingWindow, setGroupingWindow] = useState(4000);
+  const [smoothScroll, setSmoothScroll] = useState(true);
+
+  const selectedLanguage = SUPPORTED_LANGUAGES.find(l => l.code === sourceLanguage);
+
+  const handleGroupingWindowChange = (value: number[]) => {
+    const newValue = value[0];
+    setGroupingWindow(newValue);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('chat:setGroupingWindow', { detail: newValue }));
+    }
+  };
+
+  const handleSmoothScrollChange = (checked: boolean) => {
+    setSmoothScroll(checked);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('chat:setSmooth', { detail: checked }));
+    }
+  };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h4 style={styles.title}>🌍 Language & Context Settings</h4>
-      </div>
+    <div className="w-full mb-6">
+      <Accordion type="multiple" defaultValue={['source-languages']} className="w-full">
+        {/* Section 1: Source Languages */}
+        <div className="mb-[1cm] last:mb-0">
+          <AccordionItem value="source-languages" className="border rounded-lg px-4 bg-white dark:bg-slate-800 shadow-sm relative">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              <span className="font-semibold">Source Languages</span>
+              {selectedLanguage && (
+                <span className="ml-2 text-sm text-muted-foreground">
+                  ({selectedLanguage.flag} {selectedLanguage.name})
+                </span>
+              )}
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pb-6">
+            <div className="space-y-4 pt-2">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="source-language" className="text-sm font-medium">
+                    Source Language
+                  </Label>
+                  <Select
+                    value={sourceLanguage}
+                    onValueChange={setSourceLanguage}
+                    disabled={isRecording}
+                  >
+                    <SelectTrigger 
+                      id="source-language" 
+                      className="w-full h-10"
+                    >
+                      <SelectValue>
+                        {selectedLanguage ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{selectedLanguage.flag}</span>
+                            <span className="font-medium">{selectedLanguage.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Select a language...</span>
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_LANGUAGES.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code} className="cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{lang.flag}</span>
+                            <span>{lang.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed flex items-center gap-1.5">
+                  {sourceLanguage === 'auto' ? (
+                    <>
+                      <AlertCircle className="h-3 w-3" />
+                      Language will be automatically detected from speech
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3 w-3" />
+                      Optimized for {selectedLanguage?.name} speech recognition
+                    </>
+                  )}
+                </p>
+              </div>
 
-      <div style={styles.content}>
-        {/* Source Language Selection */}
-        <div style={styles.setting}>
-          <label style={styles.label}>Source Language</label>
-          <div style={styles.languageGrid}>
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => setSourceLanguage(lang.code)}
-                disabled={isRecording}
-                style={{
-                  ...styles.languageButton,
-                  ...(sourceLanguage === lang.code ? styles.languageButtonActive : {}),
-                }}
-              >
-                <span style={styles.flag}>{lang.flag}</span>
-                <span style={styles.langName}>{lang.name}</span>
-              </button>
-            ))}
-          </div>
-          <p style={styles.helpText}>
-            {sourceLanguage === 'auto' 
-              ? 'Language will be automatically detected'
-              : `Optimized for ${SUPPORTED_LANGUAGES.find(l => l.code === sourceLanguage)?.name || 'selected language'}`
-            }
-          </p>
+              {isRecording && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                  <p className="text-xs text-amber-900">
+                    ⚠️ Language settings locked during recording. Stop to change.
+                  </p>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+          </AccordionItem>
         </div>
 
-        {/* Vocabulary/Context Hints */}
-        <div style={styles.setting}>
-          <div style={styles.settingHeader}>
-            <label style={styles.label}>Vocabulary & Context Hints</label>
-            <button
-              onClick={() => setShowVocabularyInput(!showVocabularyInput)}
-              style={styles.toggleLink}
-              disabled={isRecording}
-            >
-              {showVocabularyInput ? '▼ Hide' : '▶ Show'}
-            </button>
-          </div>
-          
-          {showVocabularyInput && (
-            <>
-              <textarea
-                value={vocabularyContext}
-                onChange={(e) => setVocabularyContext(e.target.value)}
-                disabled={isRecording}
-                placeholder="Enter names, technical terms, acronyms, or context&#10;Example: Dr. Müller, Kubernetes, API, machine learning&#10;Separate with commas or new lines"
-                style={styles.textarea}
-                rows={4}
-              />
-              <p style={styles.helpText}>
-                💡 Add custom vocabulary to improve accuracy for specific terms, names, or technical jargon.
-              </p>
-            </>
-          )}
+        {/* Section 2: Chat Behavior */}
+        <div className="mb-[1cm] last:mb-0">
+          <AccordionItem value="chat-behavior" className="border rounded-lg px-4 bg-white dark:bg-slate-800 shadow-sm relative">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="font-semibold">Chat Behavior</span>
+              <span className="ml-2 text-xs text-muted-foreground">
+                ({(groupingWindow / 1000).toFixed(1)}s)
+              </span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pb-6">
+            <div className="space-y-4 pt-2">
+              {/* Message Grouping Window */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Message Grouping Window</Label>
+                  <span className="text-sm text-muted-foreground">{(groupingWindow / 1000).toFixed(1)}s</span>
+                </div>
+                <Slider value={[groupingWindow]} onValueChange={handleGroupingWindowChange} min={1000} max={8000} step={500} disabled={isRecording} />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>1.0s</span>
+                  <span>8.0s</span>
+                </div>
+              </div>
+
+              {/* Smooth Auto-Scroll */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="smooth-scroll" className="text-sm font-medium">Smooth Auto-Scroll</Label>
+                  <p className="text-xs text-muted-foreground">Auto-scroll when new messages arrive</p>
+                </div>
+                <Switch id="smooth-scroll" checked={smoothScroll} onCheckedChange={handleSmoothScrollChange} disabled={isRecording} />
+              </div>
+
+              {/* Voice Activity Detection */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="vad-toggle" className="text-sm font-medium">Voice Activity Detection</Label>
+                    <p className="text-xs text-muted-foreground">Auto-finalize during pauses</p>
+                  </div>
+                  <Switch id="vad-toggle" checked={vadEnabled} onCheckedChange={toggleVAD} disabled={isRecording} />
+                </div>
+                {vadEnabled && (
+                  <div className="space-y-2 mt-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Silence Threshold</Label>
+                      <span className="text-sm text-muted-foreground">{silenceThreshold}ms</span>
+                    </div>
+                    <Slider value={[silenceThreshold]} onValueChange={(val) => setSilenceThreshold(val[0])} min={300} max={2000} step={100} disabled={isRecording} />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>300ms</span>
+                      <span>2000ms</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sentence Mode */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="sentence-mode" className="text-sm font-medium">Sentence Mode</Label>
+                    <p className="text-xs text-muted-foreground">Stitch complete sentences</p>
+                  </div>
+                  <Switch id="sentence-mode" checked={sentenceMode} onCheckedChange={setSentenceMode} disabled={isRecording} />
+                </div>
+                {sentenceMode && (
+                  <div className="space-y-2 mt-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Sentence Hold Time</Label>
+                      <span className="text-sm text-muted-foreground">{sentenceHoldMs}ms</span>
+                    </div>
+                    <Slider value={[sentenceHoldMs]} onValueChange={(val) => setSentenceHoldMs(val[0])} min={300} max={900} step={50} disabled={isRecording} />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>300ms</span>
+                      <span>900ms</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {isRecording && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                  <p className="text-xs text-amber-900">⚠️ Settings locked during recording</p>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+          </AccordionItem>
         </div>
 
-        {/* Chat Behavior Settings */}
-        <div style={styles.setting}>
-          <label style={styles.label}>Chat Behavior</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={styles.helpText}>Grouping window</span>
-            <input
-              type="range"
-              min={1000}
-              max={8000}
-              step={500}
-              defaultValue={4000}
-              onChange={(e) => {
-                window.dispatchEvent(new CustomEvent('chat:setGroupingWindow', { detail: Number(e.currentTarget.value) }));
-              }}
-            />
-            <span style={styles.helpText}>1s – 8s</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <span style={styles.helpText}>Smooth auto-scroll</span>
-            <input
-              type="checkbox"
-              defaultChecked
-              onChange={(e) => {
-                window.dispatchEvent(new CustomEvent('chat:setSmooth', { detail: e.currentTarget.checked }));
-              }}
-            />
-          </div>
+        {/* Section 3: Vocabulary & Context Hints */}
+        <div className="mb-[1cm] last:mb-0">
+          <AccordionItem value="vocabulary" className="border rounded-lg px-4 bg-white dark:bg-slate-800 shadow-sm relative">
+          <AccordionTrigger className="hover:no-underline">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              <span className="font-semibold">Vocabulary & Context Hints</span>
+              {vocabularyContext && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Active</span>
+              )}
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pb-6">
+            <div className="space-y-3 pt-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="vocabulary-hints" className="text-sm font-medium">Custom Vocabulary</Label>
+                <Textarea
+                  id="vocabulary-hints"
+                  value={vocabularyContext}
+                  onChange={(e) => setVocabularyContext(e.target.value)}
+                  disabled={isRecording}
+                  placeholder="Enter names, technical terms, acronyms&#10;Example: Dr. Müller, Kubernetes, API"
+                  className="min-h-[100px] resize-y"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Add custom terms to improve recognition accuracy</p>
+              {isRecording && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-900" />
+                  <p className="text-xs text-amber-900">Settings locked during recording</p>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+          </AccordionItem>
         </div>
-
-        {/* Status */}
-        {isRecording && (
-          <div style={styles.warningBox}>
-            <p style={styles.warningText}>
-              ⚠️ Language settings locked during recording. Stop to change.
-            </p>
-          </div>
-        )}
-      </div>
+      </Accordion>
     </div>
   );
 }
-
-// Styles
-const styles = {
-  container: {
-    backgroundColor: '#f9fafb',
-    border: '1px solid #e5e7eb',
-    borderRadius: '0.5rem',
-    overflow: 'hidden',
-    marginBottom: '1rem',
-  },
-  header: {
-    padding: '0.75rem 1rem',
-    backgroundColor: '#f3f4f6',
-    borderBottom: '1px solid #e5e7eb',
-  },
-  title: {
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    color: '#374151',
-    margin: 0,
-  },
-  content: {
-    padding: '1rem',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1rem',
-  },
-  setting: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '0.5rem',
-  },
-  settingHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    color: '#1f2937',
-  },
-  languageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-    gap: '0.5rem',
-  },
-  languageButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.625rem 0.875rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '0.375rem',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    fontSize: '0.8125rem',
-    fontWeight: '500',
-  },
-  languageButtonActive: {
-    backgroundColor: '#eff6ff',
-    border: '2px solid #3b82f6',
-    color: '#1e40af',
-    fontWeight: '600',
-  },
-  flag: {
-    fontSize: '1.125rem',
-  },
-  langName: {
-    flex: 1,
-    textAlign: 'left' as const,
-  },
-  toggleLink: {
-    fontSize: '0.75rem',
-    color: '#3b82f6',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '0.25rem 0.5rem',
-    fontWeight: '500',
-  },
-  textarea: {
-    width: '100%',
-    padding: '0.75rem',
-    backgroundColor: '#ffffff',
-    border: '1px solid #d1d5db',
-    borderRadius: '0.375rem',
-    fontSize: '0.8125rem',
-    fontFamily: 'inherit',
-    lineHeight: '1.5',
-    resize: 'vertical' as const,
-    minHeight: '80px',
-  },
-  helpText: {
-    fontSize: '0.75rem',
-    color: '#6b7280',
-    margin: '0.25rem 0 0 0',
-    lineHeight: '1.5',
-  },
-  warningBox: {
-    backgroundColor: '#fef3c7',
-    border: '1px solid #fde047',
-    borderRadius: '0.375rem',
-    padding: '0.75rem',
-  },
-  warningText: {
-    fontSize: '0.75rem',
-    color: '#92400e',
-    margin: 0,
-    fontWeight: '500',
-  },
-};
-
