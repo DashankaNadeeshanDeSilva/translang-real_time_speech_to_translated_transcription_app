@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.13.1",
     "@echogarden/fvad-wasm": "^0.2.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -24,6 +25,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@soniox/speech-to-text-web": "^1.0.0",
+    "@supabase/supabase-js": "^2.86.2",
     "@tailwindcss/postcss": "^4.1.15",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

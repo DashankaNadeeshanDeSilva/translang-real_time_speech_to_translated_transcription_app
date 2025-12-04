@@ -18,7 +18,9 @@ import {
   Languages,
   Sun,
   Download,
+  FileText,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useTheme } from './theme-provider';
 import { LanguageSettings } from './LanguageSettings';
 import { ExportButtonGroup } from './ExportButtonGroup';
@@ -86,6 +88,31 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="px-4 py-4">
+        {/* Navigation */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sm font-semibold">
+            Navigation
+          </SidebarGroupLabel>
+          <SidebarGroupContent className="mt-2 space-y-1">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+            >
+              <Languages className="h-4 w-4" />
+              Translation
+            </Link>
+            <Link
+              href="/dashboard/transcripts"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              Transcripts
+            </Link>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <Separator className="my-4" />
+
         <LanguageSettings
           sourceLanguage={sourceLanguage}
           setSourceLanguage={setSourceLanguage}
