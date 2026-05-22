@@ -214,4 +214,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - [Next.js](https://nextjs.org/) and [TypeScript](https://www.typescriptlang.org/) communities
 
 
-**TransLang** - Breaking language barriers in real-time
+**TransLang** - Breaking language barriers in real-time.
