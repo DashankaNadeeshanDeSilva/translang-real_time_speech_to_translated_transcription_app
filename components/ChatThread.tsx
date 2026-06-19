@@ -5,12 +5,14 @@ import { ChatMessage, ChatMessageModel } from './ChatMessage';
 interface ChatThreadProps {
   committed: TranscriptLine[];
   liveText: string;
+  liveSource?: string;   // original-language live text (for the in-progress bubble)
+  showSource?: boolean;  // whether to show the original beneath the translation
   isRecording: boolean;
   groupingWindowMs?: number; // default 4000
   smoothScroll?: boolean; // immediate vs smooth
 }
 
-export function ChatThread({ committed, liveText, isRecording, groupingWindowMs = 4000, smoothScroll = true }: ChatThreadProps) {
+export function ChatThread({ committed, liveText, liveSource = '', showSource = false, isRecording, groupingWindowMs = 4000, smoothScroll = true }: ChatThreadProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
   const lastUserScrollAtRef = useRef(0);
@@ -23,18 +25,20 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
     let lastSpeaker: string | undefined;
     let lastTime = 0;
 
-    for (const line of committed) {
+    committed.forEach((line) => {
       const startsGroup = line.speaker !== lastSpeaker || (line.timestamp - lastTime) > groupingWindowMs;
       out.push({
         id: line.id,
         speaker: line.speaker,
         text: line.text,
+        // Original is paired at commit time and stored on the line itself
+        originalText: showSource ? line.originalText : undefined,
         timestamp: line.timestamp,
         startsGroup,
       });
       lastSpeaker = line.speaker;
       lastTime = line.timestamp;
-    }
+    });
 
     if (liveText) {
       const now = Date.now();
@@ -43,6 +47,7 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
         id: `live-${now}`,
         speaker: last?.speaker,
         text: liveText,
+        originalText: showSource ? (liveSource || undefined) : undefined,
         timestamp: now,
         isLive: true,
         startsGroup: false,
@@ -50,7 +55,7 @@ export function ChatThread({ committed, liveText, isRecording, groupingWindowMs 
     }
 
     return out;
-  }, [committed, liveText, groupingWindowMs]);
+  }, [committed, liveText, liveSource, showSource, groupingWindowMs]);
 
   // Near-bottom detection
   const isNearBottom = () => {

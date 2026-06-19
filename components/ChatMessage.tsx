@@ -5,6 +5,7 @@ export interface ChatMessageModel {
   id: string;
   speaker?: string;
   text: string;
+  originalText?: string;  // Original spoken-language text (shown beneath translation)
   timestamp: number;
   isLive?: boolean;
   startsGroup?: boolean;
@@ -53,12 +54,24 @@ export function ChatMessage({ msg }: ChatMessageProps) {
         transition-all duration-200
       `}>
         <div className="flex items-end gap-3">
-          <span className={`flex-1 text-sm leading-relaxed ${colorScheme.text}`}>
-            {msg.text}
-            {msg.isLive && (
-              <span className={`ml-1 animate-pulse ${colorScheme.text}`}>●</span>
+          <div className="flex-1 min-w-0">
+            {/* Translated text (primary focus) */}
+            <span className={`block text-sm leading-relaxed ${colorScheme.text}`}>
+              {msg.text}
+              {msg.isLive && (
+                <span className={`ml-1 animate-pulse ${colorScheme.text}`}>●</span>
+              )}
+            </span>
+
+            {/* Original-language text (secondary, lighter shade) */}
+            {msg.originalText && (
+              <span
+                className={`block mt-1.5 pt-1.5 border-t border-black/5 text-xs italic leading-relaxed ${colorScheme.text} opacity-60`}
+              >
+                {msg.originalText}
+              </span>
             )}
-          </span>
+          </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             {timeText}
           </span>

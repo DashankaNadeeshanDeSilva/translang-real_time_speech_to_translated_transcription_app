@@ -47,6 +47,7 @@ interface TranslatorResult {
 export interface TranscriptLine {
   id: string;
   text: string;
+  originalText?: string;  // Paired original-language text (for dual display)
   timestamp: number;
   speaker?: string;  // Speaker label (e.g., "1", "2", "3")
 }
@@ -356,6 +357,19 @@ export function useTranslator(): UseTranslatorReturn {
       console.warn(`⚠️ No speaker detected in source tokens`);
     }
 
+    // Accumulate the matching original-language (source) tokens in the same buffer
+    // so they commit together with the translation as a paired bubble. Must run
+    // after updateSpeaker() (which flushes the previous speaker) so these tokens
+    // belong to the current speaker's segment.
+    if (translationBufferRef.current) {
+      const sourceFinalTokens = tokens.filter(
+        t => t.translation_status === 'original' && t.is_final
+      );
+      if (sourceFinalTokens.length > 0) {
+        translationBufferRef.current.addSourceTokens(sourceFinalTokens);
+      }
+    }
+
     // Process translation tokens (English) - Phase 8: Use new buffer system
     const {
       finalTokens,
@@ -647,6 +661,7 @@ export function useTranslator(): UseTranslatorReturn {
           const newLine: TranscriptLine = {
             id: generateLineId(),
             text: sentence.text,
+            originalText: sentence.originalText,
             timestamp: Date.now(),
             speaker: sentence.speaker,
           };

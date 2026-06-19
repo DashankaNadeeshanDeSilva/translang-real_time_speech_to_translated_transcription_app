@@ -216,6 +216,25 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
                 </>
               )}
 
+              {(isRecording || committedTranslation.length > 0) && (
+                <button
+                  onClick={toggleSource}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                >
+                  {showSource ? (
+                    <>
+                      <EyeOff size={16} />
+                      Hide Original
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={16} />
+                      Show Original
+                    </>
+                  )}
+                </button>
+              )}
+
               {committedTranslation.length > 0 && !isRecording && (
                 <button
                   onClick={handleClear}
@@ -230,9 +249,11 @@ export function TranslatorControls({ onSessionEnd }: TranslatorControlsProps = {
 
           {/* Chat-style unified thread - Full Width */}
           <div className="flex flex-col rounded-lg border bg-card overflow-hidden" style={{ maxHeight: '80vh', height: '80vh' }}>
-            <ChatThread 
-              committed={committedTranslation} 
-              liveText={liveTranslation} 
+            <ChatThread
+              committed={committedTranslation}
+              liveText={liveTranslation}
+              liveSource={liveSource}
+              showSource={showSource}
               isRecording={isRecording}
               groupingWindowMs={groupingWindowMs}
               smoothScroll={smoothScroll}

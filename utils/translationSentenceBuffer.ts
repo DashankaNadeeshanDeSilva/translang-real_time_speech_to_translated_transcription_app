@@ -18,6 +18,7 @@ import { Token } from './tokenParser';
 
 export interface TranslationSentence {
   text: string;
+  originalText?: string;  // Original-language text accumulated alongside this translation
   speaker?: string;
   isFinal: boolean;
 }
@@ -64,6 +65,9 @@ function normalizeText(text: string): string {
 export class TranslationSentenceBuffer {
   private config: Required<BufferConfig>;
   private buffer: Token[] = [];
+  // Original-language (final) tokens accumulated in parallel with the translation
+  // buffer, so they can be committed together as a matched pair.
+  private sourceBuffer: Token[] = [];
   private currentSpeaker: string | null = null;
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private holdStartTime = 0;
@@ -102,6 +106,22 @@ export class TranslationSentenceBuffer {
       }
       this.currentSpeaker = speaker;
       console.log(`👤 Current speaker updated to: ${speaker}`);
+    }
+  }
+
+  /**
+   * Accumulate original-language (source) tokens in parallel with the translation.
+   * Only FINAL source tokens are stored (non-final tokens are re-sent/revised by
+   * Soniox each batch and would duplicate). These are committed together with the
+   * translation in commitBuffer(), keeping each bubble's translation and original
+   * physically paired.
+   */
+  addSourceTokens(tokens: Token[]): void {
+    if (!this.config.enabled || tokens.length === 0) return;
+
+    const finals = tokens.filter(t => t.is_final);
+    if (finals.length > 0) {
+      this.sourceBuffer.push(...finals);
     }
   }
 
@@ -176,6 +196,7 @@ export class TranslationSentenceBuffer {
   reset(): void {
     this.clearTimer();
     this.buffer = [];
+    this.sourceBuffer = [];
     this.currentSpeaker = null;
     this.holdStartTime = 0;
     console.log('🗑️ Translation buffer reset');
@@ -239,21 +260,26 @@ export class TranslationSentenceBuffer {
    */
   private commitBuffer(): void {
     this.clearTimer();
-    
+
     if (this.buffer.length === 0) return;
 
     const text = normalizeText(this.getBufferedText());
-    
+
     if (!text) {
       this.buffer = [];
+      this.sourceBuffer = [];
       return;
     }
 
     // Determine if sentence is final (all tokens are final)
     const isFinal = this.buffer.every(t => t.is_final);
 
+    // Pair the matching original-language text accumulated since the last commit
+    const originalText = normalizeText(this.sourceBuffer.map(t => t.text).join(''));
+
     const sentence: TranslationSentence = {
       text,
+      originalText: originalText || undefined,
       speaker: this.currentSpeaker || undefined,
       isFinal,
     };
@@ -261,8 +287,9 @@ export class TranslationSentenceBuffer {
     // Commit the sentence
     this.onCommit(sentence);
 
-    // Clear buffer
+    // Clear both buffers together so the next bubble stays paired
     this.buffer = [];
+    this.sourceBuffer = [];
   }
 
   /**
